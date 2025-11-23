@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Home Workout Tracker</title>
+  <meta name="description" content="Home workout tracker with per-rep checkmarks, progress percent, and calendar. Sign in with Google." />
+
+  <style>
+    /* Futuristic, professional styling (responsive) */
+    :root{
+      --bg:#05060a; --card:#0b1220; --muted:#9aa4b2; --accent:#00d4ff; --accent2:#7c3aed;
+      --glass:rgba(255,255,255,0.03); --glass-2:rgba(255,255,255,0.02);
+      --radius:14px; --maxw:980px;
+    }
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;color:#e6eef8;background:radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,0.08), transparent), linear-gradient(180deg,#03040a 0%, #071428 70%);-webkit-font-smoothing:antialiased}
+    .wrap{max-width:var(--maxw);margin:28px auto;padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand{display:flex;align-items:center;gap:14px}
+    .logo{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:800;color:#001;letter-spacing:0.6px}
+    h1{margin:0;font-size:1.25rem}
+    .muted{color:var(--muted);font-size:0.95rem}
+
+    main{background:linear-gradient(180deg,var(--glass),transparent);padding:18px;border-radius:18px;box-shadow:0 8px 40px rgba(2,6,23,0.6)}
+
+    .top{display:flex;gap:18px;align-items:center}
+    .session-card{flex:1;background:var(--card);padding:14px;border-radius:12px}
+    .controls{display:flex;gap:10px;align-items:center}
+
+    form.add{display:flex;gap:8px;flex-wrap:wrap}
+    input,select,button{padding:10px;border-radius:10px;border:0;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));color:inherit}
+    input[type='number']{width:110px}
+    .btn{cursor:pointer;font-weight:700}
+    .btn-primary{background:linear-gradient(90deg,var(--accent2),var(--accent));color:#001}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04)}
+    .input-error{outline:2px solid rgba(255,77,79,0.9);box-shadow:0 4px 18px rgba(255,77,79,0.12);} 
+
+    .ex-list{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+    .exercise{display:grid;grid-template-columns:20% 80%;gap:12px;padding:10px;border-radius:12px;background:linear-gradient(180deg,var(--glass),var(--glass-2));align-items:center;}
+    .exercise .reps{display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;justify-content:flex-start;align-items:center;}
+    .rep{width:28px;height:28px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+    .rep input{width:18px;height:18px}
+    .rep.done{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#001}
+
+    .progress{margin-top:10px}
+    .progress-bar{height:12px;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden}
+    .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+
+    .calendar{margin-left:18px;width:260px;background:linear-gradient(180deg,var(--glass),transparent);padding:10px;border-radius:12px}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+    .cal-day{height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;background:rgba(255,255,255,0.01)}
+    .cal-day.checked{background:linear-gradient(90deg,var(--accent2),var(--accent));color:#001}
+
+    footer{margin-top:18px;color:var(--muted);font-size:0.9rem;text-align:center}
+
+    @media (max-width:880px){.top{flex-direction:column}.calendar{width:100%;margin-left:0}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo">HW</div>
+        <div>
+          <h1>Home Workout Tracker</h1>
+          <div class="muted">Professional · Futuristic · Sync across devices with Google</div>
+        </div>
+      </div>
+      <div class="controls">
+        <div id="userInfo" class="muted">Not signed in</div>
+        <button id="signBtn" class="btn btn-primary">Sign in with Google</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="top">
+        <div class="session-card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:800">Today's Session</div>
+              <div class="muted" id="sessionDate"></div>
+            </div>
+            <div class="muted">Completion: <span id="percent">0%</span></div>
+          </div>
+
+          <form id="addForm" class="add" onsubmit="return false;" style="margin-top:12px">
+            <input id="exName" placeholder="Exercise name" required />
+            <input id="exReps" type="number" min="1" value="10" required />
+            <button id="addBtn" class="btn btn-ghost">Add</button>
+            <button id="clearBtn" class="btn" style="background:transparent;color:var(--muted)">Clear</button>
+          </form>
+
+          <div class="ex-list" id="exList"></div>
+
+          <div class="progress" aria-hidden>
+            <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+          </div>
+
+        </div>
+
+        <aside class="calendar" aria-label="Calendar">
+          <div style="font-weight:800;margin-bottom:8px">Check-ins</div>
+          <div id="calMonth" class="muted" style="margin-bottom:8px"></div>
+          <div class="cal-grid" id="calGrid"></div>
+        </aside>
+      </div>
+
+      <footer>
+        Tip: Sign in with Google to sync progress across devices. If you don't sign in, data will stay on this browser only.
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    /***** FIREBASE CONFIGURATION (REPLACE WITH YOURS) *****/
+    // If you want sync across devices, create a Firebase project and paste the config below.
+    // Example shape:
+    // const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyCHTi8h6yEO1f3V02Ztu-fsdxAXtIWoq0o",
+      authDomain: "workoutdb-9e226.firebaseapp.com",
+      projectId: "workoutdb-9e226",
+      storageBucket: "workoutdb-9e226.firebasestorage.app",
+      messagingSenderId: "443315512590",
+      appId: "1:443315512590:web:d7e1d285d62db61682a35f"
+    };
+
+    const FIREBASE_CONFIG = null; // <-- replace null with your config object to enable Google sign-in + Firestore
+
+    /***** Minimal app state & utils *****/
+    const uidKey = 'hw_user_id';
+    let currentUser = null; // { uid, name, email }
+    let sessionDate = (new Date()).toISOString().slice(0,10);
+    const state = { exercises: [] } // exercises: [{id,name,reps,doneCount, repsState: [bool...] }]
+
+    // DOM refs
+    const el = id=>document.getElementById(id);
+    const exList = el('exList'), percentEl = el('percent'), progressFill = el('progressFill'), sessionDateEl = el('sessionDate');
+
+    sessionDateEl.textContent = new Date().toLocaleDateString();
+
+    // --- Persistence layer (Firestore if configured; otherwise localStorage) ---
+    let useFirestore = false; let db=null; let auth=null;
+
+    async function initFirebaseIfNeeded(){
+      if(!FIREBASE_CONFIG) return;
+      try{
+        // load firebase libs dynamically
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js');
+        const app = firebase.initializeApp(FIREBASE_CONFIG);
+        auth = firebase.auth(); db = firebase.firestore(); useFirestore = true;
+        auth.onAuthStateChanged(u=>{
+          if(u) onUserSignIn({uid:u.uid,name:u.displayName,email:u.email}); else onUserSignOut();
+        });
+      }catch(e){console.warn('Firebase init failed',e);}    
+    }
+
+    function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+
+    // Local persistence keys
+    function storageKeyForUser(uid){return `hw:${uid||'local'}:${sessionDate}`}
+
+    async function loadState(){
+      if(useFirestore && currentUser){
+        try{
+          const doc = await db.collection('sessions').doc(currentUser.uid).collection('days').doc(sessionDate).get();
+          if(doc.exists){ const data = doc.data(); if(data && data.exercises) state.exercises = data.exercises; render(); return; }
+        }catch(e){console.warn(e)}
+      }
+      // fallback: localStorage
+      const raw = localStorage.getItem(storageKeyForUser(currentUser?currentUser.uid:null));
+      if(raw){ try{ const parsed = JSON.parse(raw); if(parsed && parsed.exercises) state.exercises = parsed.exercises; }catch(e){} render(); }
+    }
+
+    // Save session also to date-key for calendar lookups
+    async function saveState(){
+      const key = storageKeyForUser(currentUser?currentUser.uid:null);
+      try{ localStorage.setItem(key, JSON.stringify(state)); }catch(e){console.warn('localStorage save failed',e)}
+      // also store per-date key for calendar quick check
+      const dayKey = `hw:${currentUser?currentUser.uid:'local'}:${sessionDate}`;
+      try{ localStorage.setItem(dayKey, JSON.stringify(state)); }catch(e){}
+      if(useFirestore && currentUser){
+        try{ await db.collection('sessions').doc(currentUser.uid).collection('days').doc(sessionDate).set(state); }catch(e){console.warn('save failed',e)}
+      }
+    }
+
+    // --- UI / behavior ---
+    // Updated REP UI: use checkboxes instead of numbered tiles
+    function render(){
+      exList.innerHTML='';
+      let total=0, done=0;
+      state.exercises.forEach((ex, idx)=>{
+        const wrap = document.createElement('div'); wrap.className='exercise';
+        const left = document.createElement('div');
+        const title = document.createElement('div'); title.style.fontWeight='800'; title.textContent = ex.name;
+        const small = document.createElement('div'); small.className='muted'; small.textContent = `${ex.reps} reps`;
+        left.appendChild(title); left.appendChild(small);
+
+        const right = document.createElement('div'); right.className='reps';
+        for(let i=0;i<ex.reps;i++){
+          total++;
+          const repWrap = document.createElement('div'); repWrap.className='rep';
+          const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = !!ex.repsState[i];
+          checkbox.addEventListener('change', ()=>{ toggleRep(idx,i); });
+          repWrap.appendChild(checkbox);
+          if(ex.repsState[i]) repWrap.classList.add('done');
+          if(ex.repsState[i]) done++;
+          right.appendChild(repWrap);
+        }
+
+        wrap.appendChild(left); wrap.appendChild(right);
+        exList.appendChild(wrap);
+      });
+
+      const pct = total? Math.round(done/total*100):0;
+      percentEl.textContent = pct + '%'; progressFill.style.width = pct + '%';
+      saveState(); updateCalendar();
+    }
+
+    function toggleRep(exIdx, repIdx){
+      const ex = state.exercises[exIdx];
+      if(!ex || !Array.isArray(ex.repsState)) return;
+      ex.repsState[repIdx] = !ex.repsState[repIdx];
+      render();
+    }
+
+    // add exercise
+    el('addBtn').addEventListener('click', ()=>{
+      const name = el('exName').value.trim(); const reps = parseInt(el('exReps').value)||0;
+      // simple validation: only show red border if invalid
+      if(!name || reps<=0){
+        if(!name) el('exName').classList.add('input-error'); else el('exName').classList.remove('input-error');
+        if(reps<=0) el('exReps').classList.add('input-error'); else el('exReps').classList.remove('input-error');
+        return;
+      }
+      const ex = { id:Date.now().toString(36), name, reps, repsState: Array(reps).fill(false) };
+      state.exercises.push(ex); el('exName').value=''; el('exReps').value=10;  el('exName').classList.remove('input-error'); el('exReps').classList.remove('input-error'); render();
+    });
+
+    el('clearBtn').addEventListener('click', ()=>{ state.exercises=[]; render(); });
+
+    // remove error styles when user edits inputs
+    el('exName').addEventListener('input', ()=>{ el('exName').classList.remove('input-error'); });
+    el('exReps').addEventListener('input', ()=>{ el('exReps').classList.remove('input-error'); });
+
+    // --- Calendar ---
+    function updateCalendar(){
+      const grid = el('calGrid'); grid.innerHTML='';
+      const now = new Date(); const year = now.getFullYear(), month = now.getMonth();
+      el('calMonth').textContent = now.toLocaleString(undefined,{month:'long',year:'numeric'});
+      const first = new Date(year,month,1).getDay(); const days = new Date(year,month+1,0).getDate();
+
+      // pad
+      for(let i=0;i<first;i++){ const d=document.createElement('div'); d.className='cal-day'; grid.appendChild(d); }
+      for(let d=1;d<=days;d++){
+        const day = document.createElement('div'); day.className='cal-day'; day.textContent = d;
+        const keyDate = new Date(year,month,d).toISOString().slice(0,10);
+        const checked = checkinExistsForDate(keyDate);
+        if(checked) day.classList.add('checked');
+        grid.appendChild(day);
+      }
+    }
+
+    function checkinExistsForDate(d){
+      // For simplicity: uses localStorage key for that date. If using Firestore, we could query per-user per-day docs.
+      const key = `hw:${currentUser?currentUser.uid:'local'}:${d}`;
+      try{ const raw = localStorage.getItem(key); if(raw){ const s=JSON.parse(raw); return (s.exercises||[]).some(ex=> (ex.repsState||[]).some(Boolean)); } }catch(e){}
+      return false;
+    }
+
+    // --- Auth ---
+    el('signBtn').addEventListener('click', async ()=>{
+      if(!useFirestore){ alert('Firebase not configured. Install your Firebase config in the file to enable Google sign-in and sync.'); return; }
+      try{
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await auth.signInWithPopup(provider);
+      }catch(e){console.warn(e)}
+    });
+
+    function onUserSignIn(u){ currentUser = {uid:u.uid,name:u.name||u.displayName,email:u.email}; el('userInfo').textContent = currentUser.name || currentUser.email; el('signBtn').textContent = 'Sign out'; el('signBtn').onclick = ()=>auth.signOut(); initAfterAuth(); }
+    function onUserSignOut(){ currentUser = null; el('userInfo').textContent = 'Not signed in'; el('signBtn').textContent = 'Sign in with Google'; el('signBtn').onclick = ()=>{ if(useFirestore) auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); else alert('Firebase not configured.'); } ; initAfterAuth(); }
+
+    async function initAfterAuth(){ await initFirebaseIfNeeded(); await loadState(); render(); }
+
+    // initialize app
+    (async ()=>{
+      await initFirebaseIfNeeded();
+      // If no firebase configured, load local state immediately
+      await loadState(); render();
+    })();
+
+  </script>
+</body>
+</html>
