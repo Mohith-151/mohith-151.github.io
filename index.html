@@ -49,7 +49,7 @@
 
     .progress{margin-top:10px}
     .progress-bar{height:12px;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden}
-    .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+    .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 260ms ease}
 
     .calendar{margin-left:18px;width:260px;background:linear-gradient(180deg,var(--glass),transparent);padding:10px;border-radius:12px}
     .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
@@ -74,10 +74,10 @@
       </div>
       <div class="controls">
         <div id="userInfo" class="muted">Not signed in</div>
-        <button id="exportBtn" title="Export session JSON" class="btn">Export</button>
+        <button id="exportBtn" type="button" title="Export session JSON" class="btn">Export</button>
         <input id="importFile" type="file" accept="application/json" style="display:none" />
-        <button id="importBtn" title="Import session JSON" class="btn">Import</button>
-        <button id="signBtn" class="btn btn-primary">Sign in with Google</button>
+        <button id="importBtn" type="button" title="Import session JSON" class="btn">Import</button>
+        <button id="signBtn" type="button" class="btn btn-primary">Sign in with Google</button>
       </div>
     </header>
 
@@ -96,11 +96,12 @@
             <div class="muted">Completion: <span id="percent">0%</span></div>
           </div>
 
-          <form id="addForm" class="add" onsubmit="return false;" style="margin-top:12px">
-            <input id="exName" placeholder="Exercise name" required />
-            <input id="exReps" type="number" min="1" value="10" required />
-            <button id="addBtn" class="btn btn-ghost">Add</button>
-            <button id="clearBtn" class="btn" style="background:transparent;color:var(--muted)">Clear</button>
+          <!-- novalidate prevents browser validation popups -->
+          <form id="addForm" class="add" onsubmit="return false;" novalidate style="margin-top:12px">
+            <input id="exName" placeholder="Exercise name" />
+            <input id="exReps" type="number" min="1" value="10" />
+            <button id="addBtn" type="button" class="btn btn-ghost">Add</button>
+            <button id="clearBtn" type="button" class="btn" style="background:transparent;color:var(--muted)">Clear</button>
           </form>
 
           <div class="ex-list" id="exList"></div>
@@ -115,8 +116,8 @@
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <div style="font-weight:800">Check-ins</div>
             <div style="display:flex;gap:6px">
-              <button id="prevMonth" class="btn">◀</button>
-              <button id="nextMonth" class="btn">▶</button>
+              <button id="prevMonth" type="button" class="btn">◀</button>
+              <button id="nextMonth" type="button" class="btn">▶</button>
             </div>
           </div>
           <div id="calMonth" class="muted" style="margin-bottom:8px"></div>
@@ -133,12 +134,12 @@
   <script>
     /***** FIREBASE CONFIGURATION (REPLACE WITH YOURS) *****/
     const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyCHTi8h6yEO1f3V02Ztu-fsdxAXtIWoq0o",
-    authDomain: "workoutdb-9e226.firebaseapp.com",
-    projectId: "workoutdb-9e226",
-    storageBucket: "workoutdb-9e226.firebasestorage.app",
-    messagingSenderId: "443315512590",
-    appId: "1:443315512590:web:d7e1d285d62db61682a35f"
+      apiKey: "AIzaSyCHTi8h6yEO1f3V02Ztu-fsdxAXtIWoq0o",
+      authDomain: "workoutdb-9e226.firebaseapp.com",
+      projectId: "workoutdb-9e226",
+      storageBucket: "workoutdb-9e226.firebasestorage.app",
+      messagingSenderId: "443315512590",
+      appId: "1:443315512590:web:d7e1d285d62db61682a35f"
     };
 
     /***** Minimal app state & utils *****/
@@ -199,11 +200,10 @@
     }
 
     // Save session also to date-key for calendar lookups
+    // NOTE: saveState updates calendar because calendar depends on saved keys
     async function saveState(){
       const key = storageKeyForUser(currentUser?currentUser.uid:null);
       try{ localStorage.setItem(key, JSON.stringify(state)); }catch(e){console.warn('localStorage save failed',e)}
-      // also store per-date key for calendar quick check (same key as above)
-      try{ localStorage.setItem(key, JSON.stringify(state)); }catch(e){}
       if(useFirestore && currentUser){
         try{ await db.collection('sessions').doc(currentUser.uid).collection('days').doc(sessionDate).set(state); }catch(e){console.warn('save failed',e)}
       }
@@ -211,10 +211,21 @@
     }
 
     // --- UI / behavior ---
-    // Updated REP UI: use checkboxes instead of numbered tiles
+    // Helper: update only progress UI (no full DOM rebuild)
+    function updateProgressUI(){
+      let total = 0, done = 0;
+      state.exercises.forEach(ex=>{
+        total += ex.reps || 0;
+        done += (ex.repsState || []).filter(Boolean).length;
+      });
+      const pct = total ? Math.round(done/total*100) : 0;
+      percentEl.textContent = pct + '%';
+      progressFill.style.width = pct + '%';
+    }
+
+    // Updated REP UI: use checkboxes but avoid full render on toggle
     function render(){
       exList.innerHTML='';
-      let total=0, done=0;
       state.exercises.forEach((ex, idx)=>{
         const wrap = document.createElement('div'); wrap.className='exercise';
         const left = document.createElement('div'); left.className='meta';
@@ -226,27 +237,26 @@
         const repsWrap = document.createElement('div'); repsWrap.className='reps';
 
         for(let i=0;i<ex.reps;i++){
-          total++;
           const repWrap = document.createElement('div'); repWrap.className='rep';
           const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = !!ex.repsState[i];
+          // When checkbox is clicked, call toggleRep which will not re-render the whole list
           checkbox.addEventListener('change', ()=>{ toggleRep(idx,i); });
           repWrap.appendChild(checkbox);
           if(ex.repsState[i]) repWrap.classList.add('done');
-          if(ex.repsState[i]) done++;
           repsWrap.appendChild(repWrap);
         }
 
         // delete button
-        const del = document.createElement('button'); del.className='btn'; del.textContent='Delete'; del.title='Remove exercise';
-        del.addEventListener('click', ()=>{ deleteExercise(idx); });
+        const del = document.createElement('button'); del.type='button'; del.className='btn'; del.textContent='Delete'; del.title='Remove exercise';
+        del.addEventListener('click', ()=>{ if(confirm('Remove this exercise?')){ state.exercises.splice(idx,1); saveState(); render(); } });
 
         // mark complete button
-        const comp = document.createElement('button'); comp.className='btn btn-ghost'; comp.textContent='Complete'; comp.title='Mark all reps done';
-        comp.addEventListener('click', ()=>{ completeExercise(idx); });
+        const comp = document.createElement('button'); comp.type='button'; comp.className='btn btn-ghost'; comp.textContent='Complete'; comp.title='Mark all reps done';
+        comp.addEventListener('click', ()=>{ const e = state.exercises[idx]; if(!e) return; e.repsState = Array(e.reps).fill(true); saveState(); render(); });
 
         // quick edit: change reps
-        const edit = document.createElement('button'); edit.className='btn'; edit.textContent='Edit'; edit.title='Edit reps & name';
-        edit.addEventListener('click', ()=>{ openEditPrompt(idx); });
+        const edit = document.createElement('button'); edit.type='button'; edit.className='btn'; edit.textContent='Edit'; edit.title='Edit reps & name';
+        edit.addEventListener('click', ()=>{ const ex = state.exercises[idx]; if(!ex) return; const newName = prompt('Exercise name', ex.name); if(newName===null) return; const newReps = parseInt(prompt('Number of reps', ex.reps)); if(isNaN(newReps) || newReps<1) return alert('Invalid reps'); ex.name = newName.trim()||ex.name; if(newReps!==ex.reps){ ex.reps = newReps; ex.repsState = Array(newReps).fill(false); } saveState(); render(); });
 
         right.appendChild(repsWrap);
         right.appendChild(comp);
@@ -257,22 +267,37 @@
         exList.appendChild(wrap);
       });
 
-      const pct = total? Math.round(done/total*100):0;
-      percentEl.textContent = pct + '%'; progressFill.style.width = pct + '%';
-      saveState();
+      // update only progress UI (no saving here)
+      updateProgressUI();
     }
 
+    // optimized toggle: update state, patch checkbox visual, update progress & persist
     function toggleRep(exIdx, repIdx){
       const ex = state.exercises[exIdx];
       if(!ex || !Array.isArray(ex.repsState)) return;
       ex.repsState[repIdx] = !ex.repsState[repIdx];
-      render();
+
+      // update only the necessary UI pieces instead of re-building the whole list:
+      // 1) update the checkbox element's visual class if it still exists in DOM
+      const exerciseNodes = exList.childNodes;
+      const node = exerciseNodes[exIdx];
+      if(node){
+        const repsWrap = node.querySelector('.reps');
+        if(repsWrap){
+          const repNodes = repsWrap.querySelectorAll('.rep');
+          const target = repNodes[repIdx];
+          if(target){
+            if(ex.repsState[repIdx]) target.classList.add('done'); else target.classList.remove('done');
+            const cb = target.querySelector('input[type="checkbox"]');
+            if(cb) cb.checked = !!ex.repsState[repIdx];
+          }
+        }
+      }
+
+      // update progress and persist
+      updateProgressUI();
+      saveState();
     }
-
-    function deleteExercise(idx){ if(confirm('Remove this exercise?')){ state.exercises.splice(idx,1); render(); } }
-    function completeExercise(idx){ const ex = state.exercises[idx]; if(!ex) return; ex.repsState = Array(ex.reps).fill(true); render(); }
-
-    function openEditPrompt(idx){ const ex = state.exercises[idx]; if(!ex) return; const newName = prompt('Exercise name', ex.name); if(newName===null) return; const newReps = parseInt(prompt('Number of reps', ex.reps)); if(isNaN(newReps) || newReps<1) return alert('Invalid reps'); ex.name = newName.trim()||ex.name; if(newReps!==ex.reps){ ex.reps = newReps; ex.repsState = Array(newReps).fill(false); } render(); }
 
     // add exercise
     el('addBtn').addEventListener('click', ()=>{
@@ -284,10 +309,13 @@
         return;
       }
       const ex = { id:Date.now().toString(36), name, reps, repsState: Array(reps).fill(false) };
-      state.exercises.push(ex); el('exName').value=''; el('exReps').value=10;  el('exName').classList.remove('input-error'); el('exReps').classList.remove('input-error'); render();
+      state.exercises.push(ex);
+      el('exName').value=''; el('exReps').value=10;  el('exName').classList.remove('input-error'); el('exReps').classList.remove('input-error');
+      saveState();
+      render();
     });
 
-    el('clearBtn').addEventListener('click', ()=>{ if(confirm('Clear all exercises for this day?')){ state.exercises=[]; render(); } });
+    el('clearBtn').addEventListener('click', ()=>{ if(confirm('Clear all exercises for this day?')){ state.exercises=[]; saveState(); render(); } });
 
     // remove error styles when user edits inputs
     el('exName').addEventListener('input', ()=>{ el('exName').classList.remove('input-error'); });
@@ -350,7 +378,7 @@
         try{
           const parsed = JSON.parse(reader.result);
           if(parsed && Array.isArray(parsed.exercises)){
-            if(confirm('Replace current session with imported data?')){ state.exercises = parsed.exercises; if(parsed.date) setSessionDate(parsed.date); render(); }
+            if(confirm('Replace current session with imported data?')){ state.exercises = parsed.exercises; if(parsed.date) setSessionDate(parsed.date); saveState(); render(); }
           }else alert('Invalid file');
         }catch(e){alert('Invalid JSON');}
       };
