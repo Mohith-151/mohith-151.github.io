@@ -152,7 +152,6 @@
 
     /***** Minimal app state & utils *****/
     let currentUser = null; // { uid, name, email }
-    // use local date components to avoid timezone/UTC shifts
     function pad(n){return String(n).padStart(2,'0');}
     const today = new Date();
     let sessionDate = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
@@ -170,12 +169,11 @@
     // setSessionDate now safely parses YYYY-MM-DD (no timezone shifts)
     function setSessionDate(d){
       sessionDate = d;
-      // parse parts safely
       const [y,m,day] = d.split('-').map(Number);
       const display = new Date(y, m-1, day);
       sessionDateEl.textContent = display.toLocaleDateString();
       sessionDateInput.value = d; // reload state for that date
-      loadState(); render(); highlightCalendarSelection();
+      loadState(); render(); updateCalendar();
     }
 
     // initialize display values
@@ -185,45 +183,71 @@
     let useFirestore = false; let db=null; let auth=null;
     let _saveTimer = null;
 
-    async function initFirebaseIfNeeded(){
-      if(!FIREBASE_CONFIG) return;
-      try{
-        // load firebase libs dynamically
-        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
-        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js');
-        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js');
-        const app = firebase.initializeApp(FIREBASE_CONFIG);
-        auth = firebase.auth(); db = firebase.firestore(); useFirestore = true;
+    async function loadState(){
+      state.exercises = [];
+      // if using firestore & signed in, try loading
+      if(useFirestore && currentUser){
+        try{
+          const doc = await db.collection('sessions').doc(currentUser.uid).collection('days').doc(sessionDate).get();
+          if(doc.exists){ 
+            const data = doc.data(); 
+            if(data && Array.isArray(data.exercises)){
+              // coerce/normalize saved exercises to expected shape to avoid stale types from remote
+              state.exercises = data.exercises.map(ex=>{
+                const reps = Number(ex.reps) || 0;
+                const repsState = Array.isArray(ex.repsState) ? ex.repsState.map(Boolean) : Array(reps).fill(false);
+                return { id: ex.id || (Date.now().toString(36)), name: ex.name || 'Exercise', reps, repsState };
+              });
+              render(); return; 
+            }
+          }
+        }catch(e){console.warn(e)}
+      }
+      // fallback: localStorageject to handlers
         auth.onAuthStateChanged(u=>{
-          if(u) onUserSignIn({uid:u.uid,name:u.displayName,email:u.email}); else onUserSignOut();
+          if(u) onUserSignIn(u); else onUserSignOut();
         });
-      }catch(e){console.warn('Firebase init failed',e);}    
+      }catch(e){console.warn('Firebase init failed',e); useFirestore = false;}    
     }
 
     function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
 
     // Local persistence keys
-    function storageKeyForUser(uid){return `hw:${uid||'local'}:${sessionDate}`}
+    function storageKeyForUser(uid, date){ return `hw:${uid||'local'}:${date}` }
 
     async function loadState(){
-      // clear
       state.exercises = [];
+      // if using firestore & signed in, try loading
       if(useFirestore && currentUser){
         try{
           const doc = await db.collection('sessions').doc(currentUser.uid).collection('days').doc(sessionDate).get();
-          if(doc.exists){ const data = doc.data(); if(data && data.exercises) { state.exercises = data.exercises; render(); return; } }
+          if(doc.exists){ 
+            const data = doc.data(); 
+            if(data && Array.isArray(data.exercises)){
+              // coerce/normalize saved exercises to expected shape to avoid stale types from remote
+              state.exercises = data.exercises.map(ex=>{
+                const reps = Number(ex.reps) || 0;
+                const repsState = Array.isArray(ex.repsState) ? ex.repsState.map(Boolean) : Array(reps).fill(false);
+                return { id: ex.id || (Date.now().toString(36)), name: ex.name || 'Exercise', reps, repsState };
+              });
+              render(); return; 
+            }
+          }
         }catch(e){console.warn(e)}
       }
       // fallback: localStorage
-      const raw = localStorage.getItem(storageKeyForUser(currentUser?currentUser.uid:null));
-      if(raw){ try{ const parsed = JSON.parse(raw); if(parsed && parsed.exercises) state.exercises = parsed.exercises; }catch(e){} }
+      const raw = localStorage.getItem(storageKeyForUser(currentUser?currentUser.uid:null, sessionDate));
+      if(raw){ try{ const parsed = JSON.parse(raw); if(parsed && parsed.exercises) state.exercises = parsed.exercises.map(ex=>{
+          const reps = Number(ex.reps) || 0;
+          const repsState = Array.isArray(ex.repsState) ? ex.repsState.map(Boolean) : Array(reps).fill(false);
+          return { id: ex.id || (Date.now().toString(36)), name: ex.name || 'Exercise', reps, repsState };
+        }); }catch(e){} }
       render();
     }
 
     // Save session also to date-key for calendar lookups
-    // NOTE: saveState is debounced to avoid expensive reflows during rapid toggles
     async function doSave(){
-      const key = storageKeyForUser(currentUser?currentUser.uid:null);
+      const key = storageKeyForUser(currentUser?currentUser.uid:null, sessionDate);
       try{ localStorage.setItem(key, JSON.stringify(state)); }catch(e){console.warn('localStorage save failed',e)}
       if(useFirestore && currentUser){
         try{ await db.collection('sessions').doc(currentUser.uid).collection('days').doc(sessionDate).set(state); }catch(e){console.warn('save failed',e)}
@@ -249,12 +273,8 @@
       progressFill.style.width = pct + '%';
     }
 
-    // rendering guard
-    let isRendering = false;
-
     // render + stable handlers
     function render(){
-      isRendering = true;
       exList.innerHTML = '';
 
       state.exercises.forEach(ex=>{
@@ -276,11 +296,29 @@
           const checkbox = document.createElement('input');
           checkbox.type = 'checkbox';
           checkbox.checked = !!(ex.repsState && ex.repsState[i]);
+          checkbox.setAttribute('aria-label', `Rep ${i+1} for ${ex.name}`);
 
+          // Clicking the small 'rep' box toggles state. Use click on container to improve UX and remove flicker.
+          repWrap.addEventListener('click', (ev)=>{
+            ev.stopPropagation();
+            toggleRepById(exId, i);
+          });
+
+          // keep checkbox change handler but make it a no-op if it would produce the same state
           checkbox.addEventListener('change', (ev)=>{
             ev.stopPropagation();
-            if(isRendering) return;
-            toggleRepById(exId, i);
+            // if ui already reflects desired state, just ensure model is synced
+            const desired = !!checkbox.checked;
+            const idx = state.exercises.findIndex(e => e.id === exId);
+            if(idx===-1) return;
+            const exm = state.exercises[idx];
+            if(!Array.isArray(exm.repsState)) exm.repsState = Array(exm.reps).fill(false);
+            if(!!exm.repsState[i] === desired) return; // already in desired state
+            exm.repsState[i] = desired;
+            // update visual class on the container
+            if(desired) repWrap.classList.add('done'); else repWrap.classList.remove('done');
+            updateProgressUI();
+            saveState(false);
           });
 
           repWrap.appendChild(checkbox);
@@ -343,20 +381,18 @@
       });
 
       updateProgressUI();
-      requestAnimationFrame(()=>{ isRendering = false; });
     }
 
     // toggle by stable id
     function toggleRepById(exId, repIdx){
-      if(isRendering) return;
       const idx = state.exercises.findIndex(e => e.id === exId);
       if(idx === -1) return;
       const ex = state.exercises[idx];
       if(!Array.isArray(ex.repsState)) ex.repsState = Array(ex.reps).fill(false);
 
       ex.repsState[repIdx] = !ex.repsState[repIdx];
-      console.log('toggleRepById', exId, repIdx, ex.repsState[repIdx]);
 
+      // reflect immediately in DOM (avoid full re-render to prevent flicker)
       const nodes = exList.children;
       for(let n=0;n<nodes.length;n++){
         const node = nodes[n];
@@ -389,7 +425,7 @@
       }
       const ex = { id:Date.now().toString(36), name, reps, repsState: Array(reps).fill(false) };
       state.exercises.push(ex);
-      el('exName').value=''; el('exReps').value=10;  el('exName').classList.remove('input-error'); el('exReps').classList.remove('input-error');
+      el('exName').value=''; el('exReps').value=4;  el('exName').classList.remove('input-error'); el('exReps').classList.remove('input-error');
       saveState(true);
       render();
     });
@@ -426,7 +462,7 @@
     }
 
     function checkinExistsForDate(d){
-      const key = `hw:${currentUser?currentUser.uid:'local'}:${d}`;
+      const key = storageKeyForUser(currentUser?currentUser.uid:null, d);
       try{ const raw = localStorage.getItem(key); if(raw){ const s=JSON.parse(raw); return (s.exercises||[]).some(ex=> (ex.repsState||[]).some(Boolean)); } }catch(e){}
       return false;
     }
@@ -470,8 +506,17 @@
       }catch(e){console.warn(e)}
     });
 
-    function onUserSignIn(u){ currentUser = {uid:u.uid,name:u.name||u.displayName,email:u.email}; el('userInfo').textContent = currentUser.name || currentUser.email; el('signBtn').textContent = 'Sign out'; el('signBtn').onclick = ()=>auth.signOut(); initAfterAuth(); }
-    function onUserSignOut(){ currentUser = null; el('userInfo').textContent = 'Not signed in'; el('signBtn').textContent = 'Sign in with Google'; el('signBtn').onclick = ()=>{ if(useFirestore) auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); else alert('Firebase not configured.'); } ; initAfterAuth(); }
+    function onUserSignIn(u){
+      // u is the firebase.User object
+      currentUser = { uid: u.uid, name: u.displayName || u.email, email: u.email };
+      el('userInfo').textContent = currentUser.name || currentUser.email;
+      el('signBtn').textContent = 'Sign out';
+      el('signBtn').removeAttribute('disabled');
+      el('signBtn').onclick = ()=>auth.signOut();
+      // load and render session for the signed-in user
+      loadState(); render(); updateCalendar();
+    }
+    function onUserSignOut(){ currentUser = null; el('userInfo').textContent = 'Not signed in'; el('signBtn').textContent = 'Sign in with Google'; el('signBtn').onclick = null; initAfterAuth(); }
 
     async function initAfterAuth(){ await initFirebaseIfNeeded(); await loadState(); render(); }
 
