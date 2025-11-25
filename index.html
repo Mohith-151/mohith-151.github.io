@@ -59,11 +59,25 @@
 
     footer{margin-top:18px;color:var(--muted);font-size:0.9rem;text-align:center}
 
-    @media (max-width:880px){
-      .top{flex-direction:column}.calendar{width:100%;margin-left:0}
-      header .controls{gap:6px}
-      .mobile-utils{display:flex;gap:8px;justify-content:center;margin-top:12px}
-    }
+    /* Mobile: show calendar above the session card */
+@media (max-width:880px){
+  /* keep the vertical stack but ensure calendar comes first */
+  .top { flex-direction: column; }
+  .calendar {
+    order: -1;              /* move calendar to top of the column */
+    width: 100%;            /* full width on mobile */
+    margin-left: 0;         /* remove desktop left gap */
+    margin-bottom: 12px;    /* spacing below the calendar */
+  }
+  .session-card { order: 0; } /* explicit order for clarity */
+
+  /* keep header controls compact on phones */
+  header .controls { gap: 6px; }
+
+  /* shorten buttons spacing on very small screens */
+  .top .session-card, .top .calendar { padding: 12px; }
+}
+
   </style>
 </head>
 <body>
