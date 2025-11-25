@@ -4,304 +4,481 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Home Workout Tracker</title>
-  <meta name="description" content="Home workout tracker - single-file app with localStorage, import/export, date planning, and accessible controls." />
+  <meta name="description" content="Home workout tracker with per-rep checkmarks, progress percent, and calendar. Sign in with Google." />
+  <link rel="icon" type="image/png" href="logo.png" />
   <style>
-    :root{--bg:#f7f8fb;--card:#fff;--muted:#666;--accent:#2563eb;--danger:#ef4444}
-    *{box-sizing:border-box}
-    body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin:0; background:var(--bg); color:#111}
-    .container{max-width:920px;margin:28px auto;padding:20px}
-    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
-    h1{font-size:20px;margin:0}
-    .card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 18px rgba(15,23,42,0.04)}
-    .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    .btn{background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;border:0;cursor:pointer}
-    .btn.ghost{background:transparent;color:var(--accent);border:1px solid rgba(37,99,235,0.12)}
-    .btn.danger{background:var(--danger)}
-    .small{padding:6px 8px;font-size:13px}
-    .muted{color:var(--muted)}
-
-    /* Layout */
-    .main{display:grid;grid-template-columns:1fr 320px;gap:18px;margin-top:12px}
-    @media (max-width:920px){.main{grid-template-columns:1fr}}
-
-    /* left column */
-    .left .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
-    #itemsList{margin-top:8px;display:flex;flex-direction:column;gap:8px}
-    .item{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;border:1px solid rgba(15,23,42,0.03)}
-    .item label{flex:1;cursor:pointer}
-    .item .meta{font-size:12px;color:var(--muted)}
-
-    /* right column */
-    .right .section{margin-bottom:12px}
-    .stat{font-size:28px;font-weight:600}
-
-    /* Add form */
-    #addForm{display:flex;gap:8px;align-items:center;margin-top:8px}
-    #addForm input[type="text"]{flex:1;padding:8px;border-radius:8px;border:1px solid #e6e9ef}
-
-    /* popup/session */
-    #sessionPopup{position:fixed;right:18px;bottom:18px;background:var(--card);padding:12px;border-radius:10px;box-shadow:0 8px 30px rgba(15,23,42,.08);z-index:1200}
-    #sessionPopup.hidden{display:none}
-
-    /* export/import bottom on mobile */
-    .export-import{display:inline-flex;gap:8px}
-    @media (max-width:600px){
-      .export-import{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:1100;padding:8px;background:rgba(255,255,255,0.92);border-radius:12px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+    :root{
+      --bg:#05060a; --card:#0b1220; --muted:#9aa4b2; --accent:#00d4ff; --accent2:#7c3aed;
+      --glass:rgba(255,255,255,0.03); --glass-2:rgba(255,255,255,0.02);
+      --radius:14px; --maxw:980px;
     }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;color:#e6eef8;background:radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,0.08), transparent), linear-gradient(180deg,#03040a 0%, #071428 70%);-webkit-font-smoothing:antialiased}
+    .wrap{max-width:var(--maxw);margin:28px auto;padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand{display:flex;align-items:center;gap:14px}
+    .logo{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:800;color:#001;letter-spacing:0.6px}
+    h1{margin:0;font-size:1.25rem}
+    .muted{color:var(--muted);font-size:0.95rem}
 
-    /* accessibility focus */
-    .btn:focus, input:focus, select:focus, button:focus{outline:3px solid rgba(37,99,235,.14);outline-offset:2px}
-    input[type='checkbox']{width:18px;height:18px}
+    main{background:linear-gradient(180deg,var(--glass),transparent);padding:18px;border-radius:18px;box-shadow:0 8px 40px rgba(2,6,23,0.6)}
 
-    footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
+    .top{display:flex;gap:18px;align-items:center}
+    .session-card{flex:1;background:var(--card);padding:14px;border-radius:12px}
+    .controls{display:flex;gap:10px;align-items:center}
+
+    form.add{display:flex;gap:8px;flex-wrap:wrap}
+    input,select,button{padding:10px;border-radius:10px;border:0;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));color:inherit}
+    input[type='number']{width:110px}
+    input[type='date']{width:180px}
+    .btn{cursor:pointer;font-weight:700}
+    .btn-primary{background:linear-gradient(90deg,var(--accent2),var(--accent));color:#001}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04)}
+    .input-error{outline:2px solid rgba(255,77,79,0.9);box-shadow:0 4px 18px rgba(255,77,79,0.12);} 
+
+    .ex-list{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+    .exercise{display:grid;grid-template-columns:1fr auto;gap:12px;padding:10px;border-radius:12px;background:linear-gradient(180deg,var(--glass),var(--glass-2));align-items:center;}
+    .exercise .meta{display:flex;flex-direction:column}
+    .exercise .reps{display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;justify-content:flex-start;align-items:center;max-width:650px}
+    .rep{width:28px;height:28px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+    .rep input{width:18px;height:18px}
+    .rep.done{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#001}
+
+    .ex-opts{display:flex;gap:8px;align-items:center}
+    .small{font-size:0.9rem;color:var(--muted)}
+
+    .progress{margin-top:10px}
+    .progress-bar{height:12px;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden}
+    .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 260ms ease}
+
+    .calendar{margin-left:18px;width:260px;background:linear-gradient(180deg,var(--glass),transparent);padding:10px;border-radius:12px}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+    .cal-day{height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;background:rgba(255,255,255,0.01);cursor:pointer}
+    .cal-day.checked{background:linear-gradient(90deg,var(--accent2),var(--accent));color:#001}
+    .cal-day.selected{outline:2px solid rgba(124,58,237,0.6)}
+
+    footer{margin-top:18px;color:var(--muted);font-size:0.9rem;text-align:center}
+
+    @media (max-width:880px){
+      .top{flex-direction:column}.calendar{width:100%;margin-left:0}
+      header .controls{gap:6px}
+      .mobile-utils{display:flex;gap:8px;justify-content:center;margin-top:12px}
+    }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="wrap">
     <header>
-      <div style="display:flex;align-items:center;gap:12px">
-        <h1>Home Workout Tracker</h1>
-        <div class="muted">Plan, track & export your sessions</div>
-      </div>
-
-      <div class="controls">
-        <button id="googleSignIn" class="btn ghost small" aria-disabled="false">Sign in with Google</button>
-        <div class="export-import">
-          <button id="exportBtn" class="btn small">Export JSON</button>
-          <label for="importFile" class="btn small ghost" style="margin:0;cursor:pointer">Import</label>
-          <input id="importFile" type="file" accept="application/json" style="display:none">
-          <button id="resetBtn" class="btn small danger">Reset Data</button>
+      <div class="brand">
+        <div class="logo">H</div>
+        <div>
+          <h1>Home Workout Tracker</h1>
+          <div class="muted">Sync across devices with Google</div>
         </div>
+      </div>
+      <div class="controls">
+        <div id="userInfo" class="muted">Not signed in</div>
+        <button id="signBtn" type="button" class="btn btn-primary">Sign in with Google</button>
       </div>
     </header>
 
-    <main class="main">
-      <section class="left card">
-        <div class="toolbar">
-          <label for="datePicker">Date</label>
-          <input id="datePicker" type="date" aria-label="Select date">
-
-          <button id="copyFromPrev" class="btn small ghost">Copy from previous</button>
-
-          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-            <div class="muted">Completion</div>
-            <div id="completion" class="stat">0%</div>
-          </div>
-        </div>
-
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <strong>Exercises</strong>
-            <div class="muted">Check to mark done</div>
+    <main>
+      <div class="top">
+        <div class="session-card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:800">Session</div>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+                <div class="muted" id="sessionDate"></div>
+                <input id="sessionDateInput" type="date" title="Select session date (choose future dates to pre-plan)" />
+                <div class="muted small">(pick a date to plan or view)</div>
+              </div>
+            </div>
+            <div class="muted">Completion: <span id="percent">0%</span></div>
           </div>
 
-          <div id="itemsList" aria-live="polite" aria-atomic="true"></div>
+          <!-- novalidate prevents browser validation popups -->
+          <form id="addForm" class="add" onsubmit="return false;" novalidate style="margin-top:12px">
+            <input id="exName" placeholder="Exercise name" />
+            <input id="exReps" type="number" min="1" value="10" />
+            <button id="addBtn" type="button" class="btn btn-ghost">Add</button>
+            <button id="clearBtn" type="button" class="btn" style="background:transparent;color:var(--muted)">Clear</button>
+          </form>
 
-          <div id="addForm">
-            <input id="newExercise" type="text" placeholder="New exercise (e.g. Push-ups)" aria-label="New exercise name">
-            <button id="addBtn" class="btn small">Add</button>
-            <button id="clearDone" class="btn small ghost">Clear done</button>
+          <div class="ex-list" id="exList"></div>
+
+          <div class="progress" aria-hidden>
+            <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
           </div>
-        </div>
-      </section>
 
-      <aside class="right">
-        <div class="card section">
-          <strong>Session & tips</strong>
-          <p class="muted" id="sessionHint">Pick a date to plan exercises. Use Export/Import to backup your data.</p>
         </div>
 
-        <div class="card section">
-          <strong>Data tools</strong>
-          <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
-            <button id="exportBtn2" class="btn small">Export JSON (alt)</button>
-            <button id="showRaw" class="btn small ghost">Show raw data</button>
-            <div id="rawDataContainer" style="display:none;margin-top:8px;max-height:220px;overflow:auto;font-family:monospace;font-size:12px;background:#fafafa;padding:8px;border-radius:8px;border:1px solid #eee"></div>
+        <aside class="calendar" aria-label="Calendar">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="font-weight:800">Check-ins</div>
+            <div style="display:flex;gap:6px">
+              <button id="prevMonth" type="button" class="btn">◀</button>
+              <button id="nextMonth" type="button" class="btn">▶</button>
+            </div>
           </div>
+          <div id="calMonth" class="muted" style="margin-bottom:8px"></div>
+          <div class="cal-grid" id="calGrid"></div>
+        </aside>
+      </div>
+
+      <footer>
+        <div>Tip: Pick a future date using the date picker to pre-plan exercises. Sign in with Google to sync across devices.</div>
+
+        <!-- moved Export/Import controls to bottom to avoid header crowding on mobile -->
+        <div class="mobile-utils" style="margin-top:12px">
+          <input id="importFile" type="file" accept="application/json" style="display:none" />
+          <button id="exportBtn" type="button" title="Export session JSON" class="btn">Export</button>
+          <button id="importBtn" type="button" title="Import session JSON" class="btn">Import</button>
         </div>
-      </aside>
+      </footer>
     </main>
-
-    <footer class="muted">Built with ❤️ • Local data saved to your browser</footer>
-  </div>
-
-  <!-- small persistent dismissible popup -->
-  <div id="sessionPopup" class="card" role="dialog" aria-live="polite">
-    <div style="display:flex;gap:10px;align-items:center">
-      <div style="flex:1">
-        <div style="font-weight:600">Quick tip</div>
-        <div class="muted">Dismiss this and we won't show it again on this device.</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-        <button id="dismissPopup" class="btn small ghost">Dismiss</button>
-      </div>
-    </div>
   </div>
 
   <script>
-    // Simple, single-file app. Data model: localStorage key 'hwt:data' -> {dates: {"2025-11-24": [{id, name, checked}, ...]}}
-    const LS_KEY = 'hwt:data';
+    /***** FIREBASE CONFIGURATION (REPLACE WITH YOURS) *****/
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyCHTi8h6yEO1f3V02Ztu-fsdxAXtIWoq0o",
+      authDomain: "workoutdb-9e226.firebaseapp.com",
+      projectId: "workoutdb-9e226",
+      storageBucket: "workoutdb-9e226.firebasestorage.app",
+      messagingSenderId: "443315512590",
+      appId: "1:443315512590:web:d7e1d285d62db61682a35f"
+    };
 
-    // Utilities
-    function q(sel, root=document){return root.querySelector(sel)}
-    function qa(sel, root=document){return Array.from(root.querySelectorAll(sel))}
-    function uid(){ return 'id_'+Math.random().toString(36).slice(2,9) }
+    /***** Minimal app state & utils *****/
+    let currentUser = null; // { uid, name, email }
+    // use local date components to avoid timezone/UTC shifts
+    function pad(n){return String(n).padStart(2,'0');}
+    const today = new Date();
+    let sessionDate = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
 
-    // Debounce helper
-    function debounce(fn, delay=120){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), delay); }}
+    // calendar view month/year (used for prev/next month buttons)
+    let calView = { year: (new Date()).getFullYear(), month: (new Date()).getMonth() };
 
-    // Basic data load/save
-    function loadData(){ try{ return JSON.parse(localStorage.getItem(LS_KEY) || '{"dates":{}}') }catch(e){ console.error('corrupt data', e); localStorage.removeItem(LS_KEY); return {dates:{}} } }
-    function saveData(data){ localStorage.setItem(LS_KEY, JSON.stringify(data)) }
+    const state = { exercises: [] } // exercises: [{id,name,reps,doneCount, repsState: [bool...] }]
 
     // DOM refs
-    const datePicker = q('#datePicker');
-    const itemsList = q('#itemsList');
-    const completionNode = q('#completion');
-    const newExercise = q('#newExercise');
-    const addBtn = q('#addBtn');
-    const clearDone = q('#clearDone');
-    const exportBtn = q('#exportBtn');
-    const exportBtn2 = q('#exportBtn2');
-    const importFile = q('#importFile');
-    const resetBtn = q('#resetBtn');
-    const copyFromPrev = q('#copyFromPrev');
-    const rawDataContainer = q('#rawDataContainer');
-    const showRaw = q('#showRaw');
-    const sessionPopup = q('#sessionPopup');
-    const dismissPopup = q('#dismissPopup');
-    const googleSignIn = q('#googleSignIn');
+    const el = id=>document.getElementById(id);
+    const exList = el('exList'), percentEl = el('percent'), progressFill = el('progressFill'), sessionDateEl = el('sessionDate');
+    const importFile = el('importFile'); const sessionDateInput = el('sessionDateInput');
 
-    // Initialize
-    const today = new Date();
-    function toISODate(d){ const t = new Date(d); const yyyy = t.getFullYear(); const m = String(t.getMonth()+1).padStart(2,'0'); const dd = String(t.getDate()).padStart(2,'0'); return `${yyyy}-${m}-${dd}` }
-    datePicker.value = toISODate(today);
-
-    // If user previously dismissed popup, respect it
-    if (localStorage.getItem('hwt:hidePopup') === 'true') sessionPopup.classList.add('hidden');
-
-    // Disable Google sign-in if no backend
-    const oauthReady = false; // set true if you wire backend
-    if (!oauthReady) {
-      googleSignIn.setAttribute('aria-disabled','true');
-      googleSignIn.addEventListener('click', e=>{
-        e.preventDefault();
-        alert('Sign in requires a configured OAuth backend. For this static build the button is disabled.');
-      })
+    // setSessionDate now safely parses YYYY-MM-DD (no timezone shifts)
+    function setSessionDate(d){
+      sessionDate = d;
+      // parse parts safely
+      const [y,m,day] = d.split('-').map(Number);
+      const display = new Date(y, m-1, day);
+      sessionDateEl.textContent = display.toLocaleDateString();
+      sessionDateInput.value = d; // reload state for that date
+      loadState(); render(); highlightCalendarSelection();
     }
 
-    // Helpers: get items for date (ensure array)
-    function itemsFor(date){ const data = loadData(); data.dates = data.dates || {}; data.dates[date] = data.dates[date] || []; return data.dates[date] }
-    function setItemsFor(date, arr){ const data = loadData(); data.dates = data.dates || {}; data.dates[date] = arr; saveData(data) }
+    // initialize display values
+    (function(){ const [y,m,day]=sessionDate.split('-').map(Number); sessionDateEl.textContent = new Date(y,m-1,day).toLocaleDateString(); sessionDateInput.value = sessionDate; })();
 
-    // Render list (targeted updates only when possible)
-    function renderList(){ const date = datePicker.value; const items = itemsFor(date);
-      itemsList.innerHTML = '';
-      if (!items.length){ itemsList.innerHTML = '<div class="muted" style="padding:12px;border-radius:8px;background:#fff;border:1px dashed #eee">No exercises yet — add one below.</div>'; updateCompletion(); return }
+    // --- Persistence layer (Firestore if configured; otherwise localStorage) ---
+    let useFirestore = false; let db=null; let auth=null;
+    let _saveTimer = null;
 
-      for (const it of items){
-        const row = document.createElement('div'); row.className = 'item'; row.setAttribute('data-id', it.id);
-        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!it.checked; cb.setAttribute('data-item-id', it.id); cb.setAttribute('aria-label', `Mark ${it.name} done`);
-        const label = document.createElement('label'); label.textContent = it.name; label.htmlFor = it.id;
-        // name and actions
-        const meta = document.createElement('div'); meta.className = 'meta'; meta.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><button class="btn small ghost" data-edit-id="${it.id}">Edit</button><button class="btn small ghost" data-del-id="${it.id}">Delete</button></div>`;
-        row.appendChild(cb); row.appendChild(label); row.appendChild(meta);
-        itemsList.appendChild(row);
+    async function initFirebaseIfNeeded(){
+      if(!FIREBASE_CONFIG) return;
+      try{
+        // load firebase libs dynamically
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js');
+        const app = firebase.initializeApp(FIREBASE_CONFIG);
+        auth = firebase.auth(); db = firebase.firestore(); useFirestore = true;
+        auth.onAuthStateChanged(u=>{
+          if(u) onUserSignIn({uid:u.uid,name:u.displayName,email:u.email}); else onUserSignOut();
+        });
+      }catch(e){console.warn('Firebase init failed',e);}    
+    }
+
+    function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+
+    // Local persistence keys
+    function storageKeyForUser(uid){return `hw:${uid||'local'}:${sessionDate}`}
+
+    async function loadState(){
+      // clear
+      state.exercises = [];
+      if(useFirestore && currentUser){
+        try{
+          const doc = await db.collection('sessions').doc(currentUser.uid).collection('days').doc(sessionDate).get();
+          if(doc.exists){ const data = doc.data(); if(data && data.exercises) { state.exercises = data.exercises; render(); return; } }
+        }catch(e){console.warn(e)}
+      }
+      // fallback: localStorage
+      const raw = localStorage.getItem(storageKeyForUser(currentUser?currentUser.uid:null));
+      if(raw){ try{ const parsed = JSON.parse(raw); if(parsed && parsed.exercises) state.exercises = parsed.exercises; }catch(e){} }
+      render();
+    }
+
+    // Save session also to date-key for calendar lookups
+    // NOTE: saveState is debounced to avoid expensive reflows during rapid toggles
+    async function doSave(){
+      const key = storageKeyForUser(currentUser?currentUser.uid:null);
+      try{ localStorage.setItem(key, JSON.stringify(state)); }catch(e){console.warn('localStorage save failed',e)}
+      if(useFirestore && currentUser){
+        try{ await db.collection('sessions').doc(currentUser.uid).collection('days').doc(sessionDate).set(state); }catch(e){console.warn('save failed',e)}
+      }
+      updateCalendar();
+    }
+    function saveState(immediate=false){
+      if(_saveTimer) clearTimeout(_saveTimer);
+      if(immediate){ doSave(); return; }
+      _saveTimer = setTimeout(()=>{ doSave(); _saveTimer = null; }, 350);
+    }
+
+    // --- UI / behavior ---
+    // Helper: update only progress UI (no full DOM rebuild)
+    function updateProgressUI(){
+      let total = 0, done = 0;
+      state.exercises.forEach(ex=>{
+        total += ex.reps || 0;
+        done += (ex.repsState || []).filter(Boolean).length;
+      });
+      const pct = total ? Math.round(done/total*100) : 0;
+      percentEl.textContent = pct + '%';
+      progressFill.style.width = pct + '%';
+    }
+
+    // rendering guard
+    let isRendering = false;
+
+    // render + stable handlers
+    function render(){
+      isRendering = true;
+      exList.innerHTML = '';
+
+      state.exercises.forEach(ex=>{
+        const exId = ex.id;
+        const wrap = document.createElement('div'); wrap.className = 'exercise';
+        const left = document.createElement('div'); left.className = 'meta';
+        const title = document.createElement('div'); title.style.fontWeight='800'; title.textContent = ex.name;
+        const small = document.createElement('div'); small.className='muted'; small.textContent = `${ex.reps} reps`;
+        left.appendChild(title); left.appendChild(small);
+
+        const right = document.createElement('div'); right.className='ex-opts';
+        const repsWrap = document.createElement('div'); repsWrap.className='reps';
+
+        for(let i=0;i<ex.reps;i++){
+          const repWrap = document.createElement('div'); repWrap.className='rep';
+          repWrap.dataset.exId = exId;
+          repWrap.dataset.repIndex = i;
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = !!(ex.repsState && ex.repsState[i]);
+
+          checkbox.addEventListener('change', (ev)=>{
+            ev.stopPropagation();
+            if(isRendering) return;
+            toggleRepById(exId, i);
+          });
+
+          repWrap.appendChild(checkbox);
+          if(ex.repsState && ex.repsState[i]) repWrap.classList.add('done');
+          repsWrap.appendChild(repWrap);
+        }
+
+        const del = document.createElement('button'); del.type='button'; del.className='btn'; del.textContent='Delete';
+        del.dataset.id = exId;
+        del.addEventListener('click', (ev)=>{
+          ev.stopPropagation(); const id = ev.currentTarget.dataset.id;
+          const realIdx = state.exercises.findIndex(s=>s.id===id);
+          if(realIdx===-1) return;
+          if(confirm('Remove this exercise?')){
+            state.exercises.splice(realIdx,1);
+            saveState(true);
+            render();
+          }
+        });
+
+        const comp = document.createElement('button'); comp.type='button'; comp.className='btn btn-ghost'; comp.textContent='Complete';
+        comp.dataset.id = exId;
+        comp.addEventListener('click', (ev)=>{
+          ev.stopPropagation();
+          const id = ev.currentTarget.dataset.id;
+          const realIdx = state.exercises.findIndex(s=>s.id===id);
+          if(realIdx===-1) return;
+          const e = state.exercises[realIdx];
+          e.repsState = Array(e.reps).fill(true);
+          saveState(true);
+          render();
+        });
+
+        const edit = document.createElement('button'); edit.type='button'; edit.className='btn'; edit.textContent='Edit';
+        edit.dataset.id = exId;
+        edit.addEventListener('click', (ev)=>{
+          ev.stopPropagation();
+          const id = ev.currentTarget.dataset.id;
+          const realIdx = state.exercises.findIndex(s=>s.id===id);
+          if(realIdx===-1) return;
+          const exObj = state.exercises[realIdx];
+          const newName = prompt('Exercise name', exObj.name);
+          if(newName === null) return;
+          const newReps = parseInt(prompt('Number of reps', exObj.reps));
+          if(isNaN(newReps) || newReps < 1) return alert('Invalid reps');
+          exObj.name = newName.trim() || exObj.name;
+          if(newReps !== exObj.reps){ exObj.reps = newReps; exObj.repsState = Array(newReps).fill(false);} 
+          saveState(true);
+          render();
+        });
+
+        right.appendChild(repsWrap);
+        right.appendChild(comp);
+        right.appendChild(edit);
+        right.appendChild(del);
+
+        wrap.appendChild(left);
+        wrap.appendChild(right);
+        exList.appendChild(wrap);
+      });
+
+      updateProgressUI();
+      requestAnimationFrame(()=>{ isRendering = false; });
+    }
+
+    // toggle by stable id
+    function toggleRepById(exId, repIdx){
+      if(isRendering) return;
+      const idx = state.exercises.findIndex(e => e.id === exId);
+      if(idx === -1) return;
+      const ex = state.exercises[idx];
+      if(!Array.isArray(ex.repsState)) ex.repsState = Array(ex.reps).fill(false);
+
+      ex.repsState[repIdx] = !ex.repsState[repIdx];
+      console.log('toggleRepById', exId, repIdx, ex.repsState[repIdx]);
+
+      const nodes = exList.children;
+      for(let n=0;n<nodes.length;n++){
+        const node = nodes[n];
+        const repNodes = node.querySelectorAll('.rep');
+        if(!repNodes || !repNodes.length) continue;
+        if(repNodes[0] && repNodes[0].dataset && repNodes[0].dataset.exId === exId){
+          const target = repNodes[repIdx];
+          if(target){
+            if(ex.repsState[repIdx]) target.classList.add('done');
+            else target.classList.remove('done');
+
+            const cb = target.querySelector('input[type="checkbox"]');
+            if(cb && cb.checked !== !!ex.repsState[repIdx]) cb.checked = !!ex.repsState[repIdx];
+          }
+          break;
+        }
       }
 
-      updateCompletion();
+      updateProgressUI();
+      saveState(false);
     }
 
-    const updateCompletion = debounce(()=>{
-      const date = datePicker.value; const items = itemsFor(date);
-      const total = items.length; const done = items.filter(i=>i.checked).length;
-      const pct = total ? Math.round((done/total)*100) : 0;
-      completionNode.textContent = pct + '%';
-    }, 60);
-
-    // event delegation for checkbox toggle and edit/delete
-    itemsList.addEventListener('click', (e)=>{
-      const cb = e.target.closest('input[type="checkbox"]');
-      if (cb){ e.stopPropagation(); const id = cb.getAttribute('data-item-id'); toggleChecked(id, cb.checked); return }
-      const editBtn = e.target.closest('button[data-edit-id]');
-      if (editBtn){ const id = editBtn.getAttribute('data-edit-id'); editItem(id); return }
-      const delBtn = e.target.closest('button[data-del-id]');
-      if (delBtn){ const id = delBtn.getAttribute('data-del-id'); deleteItem(id); return }
+    // add exercise
+    el('addBtn').addEventListener('click', ()=>{
+      const name = el('exName').value.trim(); const reps = parseInt(el('exReps').value)||0;
+      if(!name || reps<=0){
+        if(!name) el('exName').classList.add('input-error'); else el('exName').classList.remove('input-error');
+        if(reps<=0) el('exReps').classList.add('input-error'); else el('exReps').classList.remove('input-error');
+        return;
+      }
+      const ex = { id:Date.now().toString(36), name, reps, repsState: Array(reps).fill(false) };
+      state.exercises.push(ex);
+      el('exName').value=''; el('exReps').value=10;  el('exName').classList.remove('input-error'); el('exReps').classList.remove('input-error');
+      saveState(true);
+      render();
     });
 
-    // toggle checked without re-rendering entire app (we re-render list to keep DOM coherent but updates are fast)
-    function toggleChecked(id, checked){ const date = datePicker.value; const items = itemsFor(date);
-      const idx = items.findIndex(x=>x.id===id); if (idx===-1) return; items[idx].checked = checked; setItemsFor(date, items); updateCompletion(); }
+    el('clearBtn').addEventListener('click', ()=>{ if(confirm('Clear all exercises for this day?')){ state.exercises=[]; saveState(true); render(); } });
 
-    function editItem(id){ const date = datePicker.value; const items = itemsFor(date); const idx = items.findIndex(x=>x.id===id); if (idx===-1) return; const newName = prompt('Edit exercise name', items[idx].name); if (newName && newName.trim()){ items[idx].name = newName.trim(); setItemsFor(date, items); renderList(); } }
-    function deleteItem(id){ if (!confirm('Delete this exercise?')) return; const date = datePicker.value; const items = itemsFor(date).filter(x=>x.id!==id); setItemsFor(date, items); renderList(); }
+    el('exName').addEventListener('input', ()=>{ el('exName').classList.remove('input-error'); });
+    el('exReps').addEventListener('input', ()=>{ el('exReps').classList.remove('input-error'); });
 
-    // Add
-    addBtn.addEventListener('click', ()=>{ const name = newExercise.value.trim(); if (!name) { newExercise.focus(); return } const date = datePicker.value; const arr = itemsFor(date); arr.push({id:uid(), name, checked:false}); setItemsFor(date, arr); newExercise.value=''; renderList(); newExercise.focus(); });
-    // Enter key on input
-    newExercise.addEventListener('keydown', (e)=>{ if (e.key==='Enter'){ addBtn.click(); } });
+    // calendar
+    function updateCalendar(viewYear=calView.year, viewMonth=calView.month){
+      const grid = el('calGrid'); grid.innerHTML='';
+      const year = viewYear, month = viewMonth;
+      el('calMonth').textContent = new Date(year,month,1).toLocaleString(undefined,{month:'long',year:'numeric'});
+      const first = new Date(year,month,1).getDay(); const days = new Date(year,month+1,0).getDate();
 
-    // Clear done
-    clearDone.addEventListener('click', ()=>{ const date = datePicker.value; let items = itemsFor(date); const remain = items.filter(i=>!i.checked); setItemsFor(date, remain); renderList(); });
+      for(let i=0;i<first;i++){ const d=document.createElement('div'); d.className='cal-day'; grid.appendChild(d); }
+      for(let d=1;d<=days;d++){
+        const day = document.createElement('div'); day.className='cal-day'; day.textContent = d;
+        const keyDate = `${String(year).padStart(4,'0')}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const checked = checkinExistsForDate(keyDate);
+        if(checked) day.classList.add('checked');
+        day.addEventListener('click', ()=>{ setSessionDate(keyDate); });
+        grid.appendChild(day);
+      }
+      highlightCalendarSelection();
+    }
 
-    // Date change
-    datePicker.addEventListener('change', ()=>{ renderList(); });
+    function highlightCalendarSelection(){
+      const grid = el('calGrid'); if(!grid) return; const children = grid.querySelectorAll('.cal-day'); children.forEach(c=>c.classList.remove('selected'));
+      const dayNum = Number(sessionDate.split('-')[2]);
+      const items = grid.querySelectorAll('.cal-day');
+      items.forEach(item=>{ if(Number(item.textContent)===dayNum) item.classList.add('selected'); });
+    }
 
-    // Copy from previous date
-    copyFromPrev.addEventListener('click', ()=>{
-      const d = new Date(datePicker.value);
-      d.setDate(d.getDate()-1);
-      const prev = toISODate(d);
-      const source = itemsFor(prev) || [];
-      if (!source.length){ alert('No items found on previous date'); return }
-      // shallow copy items with new ids
-      const copy = source.map(s=>({id:uid(), name:s.name, checked:false}));
-      if (!confirm(`Copy ${copy.length} items from ${prev} to ${datePicker.value}?`)) return;
-      setItemsFor(datePicker.value, copy);
-      renderList();
+    function checkinExistsForDate(d){
+      const key = `hw:${currentUser?currentUser.uid:'local'}:${d}`;
+      try{ const raw = localStorage.getItem(key); if(raw){ const s=JSON.parse(raw); return (s.exercises||[]).some(ex=> (ex.repsState||[]).some(Boolean)); } }catch(e){}
+      return false;
+    }
+
+    el('prevMonth').addEventListener('click', ()=>{ calView.month--; if(calView.month<0){ calView.month=11; calView.year--; } updateCalendar(); });
+    el('nextMonth').addEventListener('click', ()=>{ calView.month++; if(calView.month>11){ calView.month=0; calView.year++; } updateCalendar(); });
+
+    sessionDateInput.addEventListener('change', (e)=>{
+      const v = e.target.value; if(!v) return; setSessionDate(v);
     });
 
-    // Export
-    function exportData(){ const data = loadData(); const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'home-workout-data.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
-    exportBtn.addEventListener('click', exportData); exportBtn2.addEventListener('click', exportData);
+    // export/import
+    el('exportBtn').addEventListener('click', ()=>{
+      const payload = { date: sessionDate, exercises: state.exercises };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `hw-session-${sessionDate}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
 
-    // Import
-    importFile.addEventListener('change', (e)=>{
-      const f = e.target.files[0]; if (!f) return; const reader = new FileReader(); reader.onload = ()=>{
-        try{ const parsed = JSON.parse(reader.result); if (!parsed || typeof parsed !== 'object' || !parsed.dates){ throw new Error('Invalid schema: missing dates') }
-          // merge carefully: overwrite only dates present in file
-          const cur = loadData(); cur.dates = cur.dates || {};
-          for (const k of Object.keys(parsed.dates)){ // sanitize items
-            cur.dates[k] = (parsed.dates[k] || []).map(it=>({ id: it.id || uid(), name: String(it.name||'Untitled'), checked: !!it.checked }));
-          }
-          saveData(cur); alert('Import successful'); renderList();
-        }catch(err){ alert('Import failed: ' + (err.message||err)); }
+    el('importBtn').addEventListener('click', ()=> importFile.click());
+    importFile.addEventListener('change', (ev)=>{
+      const f = ev.target.files[0]; if(!f) return; const reader = new FileReader();
+      reader.onload = ()=>{
+        try{
+          const parsed = JSON.parse(reader.result);
+          if(parsed && Array.isArray(parsed.exercises)){
+            if(confirm('Replace current session with imported data?')){ state.exercises = parsed.exercises; if(parsed.date) setSessionDate(parsed.date); saveState(true); render(); }
+          }else alert('Invalid file');
+        }catch(e){alert('Invalid JSON');}
       };
       reader.readAsText(f);
-      e.target.value = ''; // reset
+      ev.target.value='';
     });
 
-    // Reset data (dangerous)
-    resetBtn.addEventListener('click', ()=>{ if (!confirm('This will clear all your saved data. Continue?')) return; localStorage.removeItem(LS_KEY); renderList(); });
-
-    // Show raw
-    showRaw.addEventListener('click', ()=>{
-      const data = loadData(); rawDataContainer.style.display = rawDataContainer.style.display === 'none' ? 'block' : 'none'; rawDataContainer.textContent = JSON.stringify(data, null, 2);
+    // auth (optional)
+    el('signBtn').addEventListener('click', async ()=>{
+      if(!useFirestore){ alert('Firebase not configured. Install your Firebase config in the file to enable Google sign-in and sync.'); return; }
+      try{
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await auth.signInWithPopup(provider);
+      }catch(e){console.warn(e)}
     });
 
-    // Popup dismissal
-    dismissPopup.addEventListener('click', ()=>{ sessionPopup.classList.add('hidden'); localStorage.setItem('hwt:hidePopup','true'); });
+    function onUserSignIn(u){ currentUser = {uid:u.uid,name:u.name||u.displayName,email:u.email}; el('userInfo').textContent = currentUser.name || currentUser.email; el('signBtn').textContent = 'Sign out'; el('signBtn').onclick = ()=>auth.signOut(); initAfterAuth(); }
+    function onUserSignOut(){ currentUser = null; el('userInfo').textContent = 'Not signed in'; el('signBtn').textContent = 'Sign in with Google'; el('signBtn').onclick = ()=>{ if(useFirestore) auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); else alert('Firebase not configured.'); } ; initAfterAuth(); }
 
-    // initial render
-    renderList();
+    async function initAfterAuth(){ await initFirebaseIfNeeded(); await loadState(); render(); }
 
-    // Expose a small safe method for console debugging
-    window.hwt = {loadData, saveData, itemsFor, setItemsFor, renderList};
-
-    // accessibility: keyboard support for list (space toggles checkbox)
-    itemsList.addEventListener('keydown', (e)=>{
-      if (e.key === ' '){ const row = e.target.closest('.item'); if (row){ const id = row.getAttribute('data-id'); const cb = row.querySelector('input[type=checkbox]'); cb.checked = !cb.checked; toggleChecked(id, cb.checked); e.preventDefault(); } }
-    });
+    (async ()=>{
+      await initFirebaseIfNeeded();
+      await loadState(); render(); updateCalendar();
+    })();
 
   </script>
 </body>
