@@ -13,7 +13,12 @@
       --radius:14px; --maxw:980px;
     }
     *{box-sizing:border-box}
-    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;color:#e6eef8;background:radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,0.08), transparent), linear-gradient(180deg,#03040a 0%, #071428 70%);-webkit-font-smoothing:antialiased}
+    body{
+      margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;color:#e6eef8;
+      background:radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,0.08), transparent),
+                 linear-gradient(180deg,#03040a 0%, #071428 70%);
+      -webkit-font-smoothing:antialiased
+    }
     .wrap{max-width:var(--maxw);margin:28px auto;padding:20px}
     header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
     .brand{display:flex;align-items:center;gap:14px}
@@ -150,99 +155,42 @@
       appId: "1:443315512590:web:d7e1d285d62db61682a35f"
     };
 
-    /***** Minimal app state & utils *****/
-    let currentUser = null; // { uid, name, email }
-    // use local date components to avoid timezone/UTC shifts
+    // Helpers for dates (avoid timezone shifts)
     function pad(n){return String(n).padStart(2,'0');}
-    const today = new Date();
-    let sessionDate = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+    const t = new Date();
+    let sessionDate = `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`;
+    let calView = { year: t.getFullYear(), month: t.getMonth() };
 
-    // calendar view month/year (used for prev/next month buttons)
-    let calView = { year: (new Date()).getFullYear(), month: (new Date()).getMonth() };
+    let currentUser = null;
+    const state = { exercises: [] };
 
-    const state = { exercises: [] } // exercises: [{id,name,reps,doneCount, repsState: [bool...] }]
-
-    // DOM refs
-    const el = id=>document.getElementById(id);
+    const el = id => document.getElementById(id);
     const exList = el('exList'), percentEl = el('percent'), progressFill = el('progressFill'), sessionDateEl = el('sessionDate');
-    const importFile = el('importFile'); const sessionDateInput = el('sessionDateInput');
+    const importFile = el('importFile'), sessionDateInput = el('sessionDateInput');
 
-    // setSessionDate now safely parses YYYY-MM-DD (no timezone shifts)
     function setSessionDate(d){
       sessionDate = d;
-      // parse parts safely
       const [y,m,day] = d.split('-').map(Number);
-      const display = new Date(y, m-1, day);
-      sessionDateEl.textContent = display.toLocaleDateString();
-      sessionDateInput.value = d; // reload state for that date
-      loadState(); render(); highlightCalendarSelection();
+      sessionDateEl.textContent = new Date(y, m-1, day).toLocaleDateString();
+      sessionDateInput.value = d;
+      loadState();
+      render();
+      highlightCalendarSelection();
     }
 
-    // initialize display values
-    (function(){ const [y,m,day]=sessionDate.split('-').map(Number); sessionDateEl.textContent = new Date(y,m-1,day).toLocaleDateString(); sessionDateInput.value = sessionDate; })();
+    (function initDisplay(){
+      const [y,m,day] = sessionDate.split('-').map(Number);
+      sessionDateEl.textContent = new Date(y, m-1, day).toLocaleDateString();
+      sessionDateInput.value = sessionDate;
+    })();
 
-    // --- Persistence layer (Firestore if configured; otherwise localStorage) ---
-    let useFirestore = false; let db=null; let auth=null;
+    // Persistence (localStorage fallback)
+    let useFirestore = false, db = null, auth = null;
     let _saveTimer = null;
 
-    async function initFirebaseIfNeeded(){
-      // If no config — bail
-      if(!FIREBASE_CONFIG) return;
-
-      // If global firebase already exists and app(s) initialized, wire up auth/db and return.
-      if(window.firebase && Array.isArray(window.firebase.apps) && window.firebase.apps.length){
-        try {
-          auth = firebase.auth();
-          db = firebase.firestore();
-          useFirestore = true;
-          auth.onAuthStateChanged(u=>{
-            if(u) onUserSignIn({uid:u.uid,name:u.displayName,email:u.email}); else onUserSignOut();
-          });
-        } catch(e) {
-          console.warn('Existing firebase present but failed to wire auth/firestore', e);
-        }
-        return;
-      }
-
-      // Otherwise load compat libs once (only when firebase global not present)
-      try{
-        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
-        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js');
-        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js');
-
-        // Protect against re-running initializeApp (some libs auto-define firebase)
-        if(!window.firebase || !window.firebase.apps || window.firebase.apps.length === 0){
-          firebase.initializeApp(FIREBASE_CONFIG);
-        }
-
-        auth = firebase.auth();
-        db = firebase.firestore();
-        useFirestore = true;
-        auth.onAuthStateChanged(u=>{
-          if(u) onUserSignIn({uid:u.uid,name:u.displayName,email:u.email}); else onUserSignOut();
-        });
-      }catch(e){
-        console.warn('Firebase init failed',e);
-      }
-    }
-
-    function loadScript(src){
-      // if script tag already exists, don't insert another
-      if(document.querySelector(`script[src=\"${src}\"]`)) return Promise.resolve();
-      return new Promise((res,rej)=>{
-        const s=document.createElement('script');
-        s.src=src; s.async = true;
-        s.onload=res; s.onerror=rej;
-        document.head.appendChild(s);
-      });
-    }
-
-
-    // Local persistence keys
-    function storageKeyForUser(uid){return `hw:${uid||'local'}:${sessionDate}`}
+    function storageKeyForUser(uid){ return `hw:${uid||'local'}:${sessionDate}`; }
 
     async function loadState(){
-      // clear
       state.exercises = [];
       if(useFirestore && currentUser){
         try{
@@ -250,19 +198,16 @@
           if(doc.exists){ const data = doc.data(); if(data && data.exercises) { state.exercises = data.exercises; render(); return; } }
         }catch(e){console.warn(e)}
       }
-      // fallback: localStorage
       const raw = localStorage.getItem(storageKeyForUser(currentUser?currentUser.uid:null));
       if(raw){ try{ const parsed = JSON.parse(raw); if(parsed && parsed.exercises) state.exercises = parsed.exercises; }catch(e){} }
       render();
     }
 
-    // Save session also to date-key for calendar lookups
-    // NOTE: saveState is debounced to avoid expensive reflows during rapid toggles
     async function doSave(){
       const key = storageKeyForUser(currentUser?currentUser.uid:null);
-      try{ localStorage.setItem(key, JSON.stringify(state)); }catch(e){console.warn('localStorage save failed',e)}
+      try{ localStorage.setItem(key, JSON.stringify(state)); }catch(e){console.warn('localStorage save failed', e);}
       if(useFirestore && currentUser){
-        try{ await db.collection('sessions').doc(currentUser.uid).collection('days').doc(sessionDate).set(state); }catch(e){console.warn('save failed',e)}
+        try{ await db.collection('sessions').doc(currentUser.uid).collection('days').doc(sessionDate).set(state); }catch(e){console.warn('save failed', e);}
       }
       updateCalendar();
     }
@@ -272,27 +217,50 @@
       _saveTimer = setTimeout(()=>{ doSave(); _saveTimer = null; }, 350);
     }
 
-    // --- UI / behavior ---
-    // Helper: update only progress UI (no full DOM rebuild)
     function updateProgressUI(){
-      let total = 0, done = 0;
+      let total=0, done=0;
       state.exercises.forEach(ex=>{
-        total += ex.reps || 0;
-        done += (ex.repsState || []).filter(Boolean).length;
+        total += ex.reps||0;
+        done += (ex.repsState||[]).filter(Boolean).length;
       });
       const pct = total ? Math.round(done/total*100) : 0;
       percentEl.textContent = pct + '%';
       progressFill.style.width = pct + '%';
     }
 
-    // rendering guard
-    let isRendering = false;
+    // New: toggle by id (robust against reorders)
+    function toggleRepById(exId, repIdx){
+      const idx = state.exercises.findIndex(e=>e.id === exId);
+      if(idx === -1) return;
+      const ex = state.exercises[idx];
+      if(!Array.isArray(ex.repsState)) ex.repsState = Array(ex.reps).fill(false);
+      ex.repsState[repIdx] = !ex.repsState[repIdx];
 
-    // render + stable handlers
+      // Update DOM if present
+      const nodes = exList.children;
+      for(let n=0;n<nodes.length;n++){
+        const node = nodes[n];
+        // find dataset-ex-id on rep nodes (we set below)
+        const repNodes = node.querySelectorAll('.rep');
+        if(!repNodes || !repNodes.length) continue;
+        // check first rep dataset to find if node matches the exId
+        if(repNodes[0] && repNodes[0].dataset && repNodes[0].dataset.exId === exId){
+          const target = repNodes[repIdx];
+          if(target){
+            if(ex.repsState[repIdx]) target.classList.add('done'); else target.classList.remove('done');
+            const cb = target.querySelector('input[type="checkbox"]');
+            if(cb && cb.checked !== !!ex.repsState[repIdx]) cb.checked = !!ex.repsState[repIdx];
+          }
+          break;
+        }
+      }
+
+      updateProgressUI();
+      saveState(false);
+    }
+
     function render(){
-      isRendering = true;
       exList.innerHTML = '';
-
       state.exercises.forEach(ex=>{
         const exId = ex.id;
         const wrap = document.createElement('div'); wrap.className = 'exercise';
@@ -308,62 +276,54 @@
           const repWrap = document.createElement('div'); repWrap.className='rep';
           repWrap.dataset.exId = exId;
           repWrap.dataset.repIndex = i;
-
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
+          const checkbox = document.createElement('input'); checkbox.type = 'checkbox';
           checkbox.checked = !!(ex.repsState && ex.repsState[i]);
-
-          checkbox.addEventListener('change', (ev)=>{
-            ev.stopPropagation();
-            if(isRendering) return;
-            toggleRepById(exId, i);
-          });
-
+          checkbox.addEventListener('change', (ev)=>{ ev.stopPropagation(); toggleRepById(exId, i); });
           repWrap.appendChild(checkbox);
           if(ex.repsState && ex.repsState[i]) repWrap.classList.add('done');
           repsWrap.appendChild(repWrap);
         }
 
-        const del = document.createElement('button'); del.type='button'; del.className='btn'; del.textContent='Delete';
+        // Delete (by id)
+        const del = document.createElement('button'); del.type='button'; del.className='btn'; del.textContent='Delete'; del.title='Remove exercise';
         del.dataset.id = exId;
         del.addEventListener('click', (ev)=>{
-          ev.stopPropagation(); const id = ev.currentTarget.dataset.id;
+          ev.stopPropagation();
+          const id = ev.currentTarget.dataset.id;
           const realIdx = state.exercises.findIndex(s=>s.id===id);
-          if(realIdx===-1) return;
-          if(confirm('Remove this exercise?')){
-            state.exercises.splice(realIdx,1);
-            saveState(true);
-            render();
-          }
+          if(realIdx === -1) return;
+          if(confirm('Remove this exercise?')){ state.exercises.splice(realIdx,1); saveState(true); render(); }
         });
 
-        const comp = document.createElement('button'); comp.type='button'; comp.className='btn btn-ghost'; comp.textContent='Complete';
+        // Complete
+        const comp = document.createElement('button'); comp.type='button'; comp.className='btn btn-ghost'; comp.textContent='Complete'; comp.title='Mark all reps done';
         comp.dataset.id = exId;
         comp.addEventListener('click', (ev)=>{
           ev.stopPropagation();
           const id = ev.currentTarget.dataset.id;
           const realIdx = state.exercises.findIndex(s=>s.id===id);
-          if(realIdx===-1) return;
+          if(realIdx === -1) return;
           const e = state.exercises[realIdx];
           e.repsState = Array(e.reps).fill(true);
           saveState(true);
           render();
         });
 
-        const edit = document.createElement('button'); edit.type='button'; edit.className='btn'; edit.textContent='Edit';
+        // Edit
+        const edit = document.createElement('button'); edit.type='button'; edit.className='btn'; edit.textContent='Edit'; edit.title='Edit reps & name';
         edit.dataset.id = exId;
         edit.addEventListener('click', (ev)=>{
           ev.stopPropagation();
           const id = ev.currentTarget.dataset.id;
           const realIdx = state.exercises.findIndex(s=>s.id===id);
-          if(realIdx===-1) return;
+          if(realIdx === -1) return;
           const exObj = state.exercises[realIdx];
           const newName = prompt('Exercise name', exObj.name);
           if(newName === null) return;
           const newReps = parseInt(prompt('Number of reps', exObj.reps));
           if(isNaN(newReps) || newReps < 1) return alert('Invalid reps');
           exObj.name = newName.trim() || exObj.name;
-          if(newReps !== exObj.reps){ exObj.reps = newReps; exObj.repsState = Array(newReps).fill(false);} 
+          if(newReps !== exObj.reps){ exObj.reps = newReps; exObj.repsState = Array(newReps).fill(false); }
           saveState(true);
           render();
         });
@@ -373,46 +333,11 @@
         right.appendChild(edit);
         right.appendChild(del);
 
-        wrap.appendChild(left);
-        wrap.appendChild(right);
+        wrap.appendChild(left); wrap.appendChild(right);
         exList.appendChild(wrap);
       });
 
       updateProgressUI();
-      requestAnimationFrame(()=>{ isRendering = false; });
-    }
-
-    // toggle by stable id
-    function toggleRepById(exId, repIdx){
-      if(isRendering) return;
-      const idx = state.exercises.findIndex(e => e.id === exId);
-      if(idx === -1) return;
-      const ex = state.exercises[idx];
-      if(!Array.isArray(ex.repsState)) ex.repsState = Array(ex.reps).fill(false);
-
-      ex.repsState[repIdx] = !ex.repsState[repIdx];
-      console.log('toggleRepById', exId, repIdx, ex.repsState[repIdx]);
-
-      const nodes = exList.children;
-      for(let n=0;n<nodes.length;n++){
-        const node = nodes[n];
-        const repNodes = node.querySelectorAll('.rep');
-        if(!repNodes || !repNodes.length) continue;
-        if(repNodes[0] && repNodes[0].dataset && repNodes[0].dataset.exId === exId){
-          const target = repNodes[repIdx];
-          if(target){
-            if(ex.repsState[repIdx]) target.classList.add('done');
-            else target.classList.remove('done');
-
-            const cb = target.querySelector('input[type="checkbox"]');
-            if(cb && cb.checked !== !!ex.repsState[repIdx]) cb.checked = !!ex.repsState[repIdx];
-          }
-          break;
-        }
-      }
-
-      updateProgressUI();
-      saveState(false);
     }
 
     // add exercise
@@ -423,19 +348,16 @@
         if(reps<=0) el('exReps').classList.add('input-error'); else el('exReps').classList.remove('input-error');
         return;
       }
-      const ex = { id:Date.now().toString(36), name, reps, repsState: Array(reps).fill(false) };
+      const ex = { id: Date.now().toString(36), name, reps, repsState: Array(reps).fill(false) };
       state.exercises.push(ex);
-      el('exName').value=''; el('exReps').value=10;  el('exName').classList.remove('input-error'); el('exReps').classList.remove('input-error');
+      el('exName').value=''; el('exReps').value=10; el('exName').classList.remove('input-error'); el('exReps').classList.remove('input-error');
       saveState(true);
       render();
     });
 
     el('clearBtn').addEventListener('click', ()=>{ if(confirm('Clear all exercises for this day?')){ state.exercises=[]; saveState(true); render(); } });
 
-    el('exName').addEventListener('input', ()=>{ el('exName').classList.remove('input-error'); });
-    el('exReps').addEventListener('input', ()=>{ el('exReps').classList.remove('input-error'); });
-
-    // calendar
+    // Calendar
     function updateCalendar(viewYear=calView.year, viewMonth=calView.month){
       const grid = el('calGrid'); grid.innerHTML='';
       const year = viewYear, month = viewMonth;
@@ -443,8 +365,9 @@
       const first = new Date(year,month,1).getDay(); const days = new Date(year,month+1,0).getDate();
 
       for(let i=0;i<first;i++){ const d=document.createElement('div'); d.className='cal-day'; grid.appendChild(d); }
-      for(let d=1;d<=days;d++){
+      for(let d=1; d<=days; d++){
         const day = document.createElement('div'); day.className='cal-day'; day.textContent = d;
+        // local YYYY-MM-DD (no timezone conversion)
         const keyDate = `${String(year).padStart(4,'0')}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const checked = checkinExistsForDate(keyDate);
         if(checked) day.classList.add('checked');
@@ -455,14 +378,15 @@
     }
 
     function highlightCalendarSelection(){
-      const grid = el('calGrid'); if(!grid) return; const children = grid.querySelectorAll('.cal-day'); children.forEach(c=>c.classList.remove('selected'));
+      const grid = el('calGrid'); if(!grid) return;
       const dayNum = Number(sessionDate.split('-')[2]);
       const items = grid.querySelectorAll('.cal-day');
-      items.forEach(item=>{ if(Number(item.textContent)===dayNum) item.classList.add('selected'); });
+      items.forEach(item=> item.classList.remove('selected'));
+      items.forEach(item=>{ if(Number(item.textContent) === dayNum) item.classList.add('selected'); });
     }
 
     function checkinExistsForDate(d){
-      const key = `hw:${currentUser?currentUser.uid:'local'}:${d}`;
+      const key = `hw:${currentUser ? currentUser.uid : 'local'}:${d}`;
       try{ const raw = localStorage.getItem(key); if(raw){ const s=JSON.parse(raw); return (s.exercises||[]).some(ex=> (ex.repsState||[]).some(Boolean)); } }catch(e){}
       return false;
     }
@@ -470,11 +394,9 @@
     el('prevMonth').addEventListener('click', ()=>{ calView.month--; if(calView.month<0){ calView.month=11; calView.year--; } updateCalendar(); });
     el('nextMonth').addEventListener('click', ()=>{ calView.month++; if(calView.month>11){ calView.month=0; calView.year++; } updateCalendar(); });
 
-    sessionDateInput.addEventListener('change', (e)=>{
-      const v = e.target.value; if(!v) return; setSessionDate(v);
-    });
+    sessionDateInput.addEventListener('change', (e)=>{ const v = e.target.value; if(!v) return; setSessionDate(v); });
 
-    // export/import
+    // Export / Import
     el('exportBtn').addEventListener('click', ()=>{
       const payload = { date: sessionDate, exercises: state.exercises };
       const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -497,7 +419,7 @@
       ev.target.value='';
     });
 
-    // auth (optional)
+    // Auth stubs (optional)
     el('signBtn').addEventListener('click', async ()=>{
       if(!useFirestore){ alert('Firebase not configured. Install your Firebase config in the file to enable Google sign-in and sync.'); return; }
       try{
@@ -509,13 +431,25 @@
     function onUserSignIn(u){ currentUser = {uid:u.uid,name:u.name||u.displayName,email:u.email}; el('userInfo').textContent = currentUser.name || currentUser.email; el('signBtn').textContent = 'Sign out'; el('signBtn').onclick = ()=>auth.signOut(); initAfterAuth(); }
     function onUserSignOut(){ currentUser = null; el('userInfo').textContent = 'Not signed in'; el('signBtn').textContent = 'Sign in with Google'; el('signBtn').onclick = ()=>{ if(useFirestore) auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); else alert('Firebase not configured.'); } ; initAfterAuth(); }
 
+    async function initFirebaseIfNeeded(){
+      if(!FIREBASE_CONFIG) return;
+      try{
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js');
+        const app = firebase.initializeApp(FIREBASE_CONFIG);
+        auth = firebase.auth(); db = firebase.firestore(); useFirestore = true;
+        auth.onAuthStateChanged(u=>{ if(u) onUserSignIn({uid:u.uid,name:u.displayName,email:u.email}); else onUserSignOut(); });
+      }catch(e){console.warn('Firebase init failed',e);}
+    }
+    function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+
     async function initAfterAuth(){ await initFirebaseIfNeeded(); await loadState(); render(); }
 
     (async ()=>{
       await initFirebaseIfNeeded();
       await loadState(); render(); updateCalendar();
     })();
-
   </script>
 </body>
 </html>
