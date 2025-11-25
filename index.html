@@ -183,27 +183,17 @@
     let useFirestore = false; let db=null; let auth=null;
     let _saveTimer = null;
 
-    async function loadState(){
-      state.exercises = [];
-      // if using firestore & signed in, try loading
-      if(useFirestore && currentUser){
-        try{
-          const doc = await db.collection('sessions').doc(currentUser.uid).collection('days').doc(sessionDate).get();
-          if(doc.exists){ 
-            const data = doc.data(); 
-            if(data && Array.isArray(data.exercises)){
-              // coerce/normalize saved exercises to expected shape to avoid stale types from remote
-              state.exercises = data.exercises.map(ex=>{
-                const reps = Number(ex.reps) || 0;
-                const repsState = Array.isArray(ex.repsState) ? ex.repsState.map(Boolean) : Array(reps).fill(false);
-                return { id: ex.id || (Date.now().toString(36)), name: ex.name || 'Exercise', reps, repsState };
-              });
-              render(); return; 
-            }
-          }
-        }catch(e){console.warn(e)}
-      }
-      // fallback: localStorageject to handlers
+    async function initFirebaseIfNeeded(){
+      // guard: initialize firebase only once — prevents duplicate auth listeners when user signs in/out repeatedly
+      if(window.__firebaseInited) return; window.__firebaseInited = true;
+      if(!FIREBASE_CONFIG) return;
+      try{
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js');
+        await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js');
+        const app = firebase.initializeApp(FIREBASE_CONFIG);
+        auth = firebase.auth(); db = firebase.firestore(); useFirestore = true;
+        // single auth state listener — pass the real firebase user object to handlers
         auth.onAuthStateChanged(u=>{
           if(u) onUserSignIn(u); else onUserSignOut();
         });
