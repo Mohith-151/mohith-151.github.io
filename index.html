@@ -186,21 +186,57 @@
     let _saveTimer = null;
 
     async function initFirebaseIfNeeded(){
+      // If no config — bail
       if(!FIREBASE_CONFIG) return;
+
+      // If global firebase already exists and app(s) initialized, wire up auth/db and return.
+      if(window.firebase && Array.isArray(window.firebase.apps) && window.firebase.apps.length){
+        try {
+          auth = firebase.auth();
+          db = firebase.firestore();
+          useFirestore = true;
+          auth.onAuthStateChanged(u=>{
+            if(u) onUserSignIn({uid:u.uid,name:u.displayName,email:u.email}); else onUserSignOut();
+          });
+        } catch(e) {
+          console.warn('Existing firebase present but failed to wire auth/firestore', e);
+        }
+        return;
+      }
+
+      // Otherwise load compat libs once (only when firebase global not present)
       try{
-        // load firebase libs dynamically
         await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
         await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js');
         await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js');
-        const app = firebase.initializeApp(FIREBASE_CONFIG);
-        auth = firebase.auth(); db = firebase.firestore(); useFirestore = true;
+
+        // Protect against re-running initializeApp (some libs auto-define firebase)
+        if(!window.firebase || !window.firebase.apps || window.firebase.apps.length === 0){
+          firebase.initializeApp(FIREBASE_CONFIG);
+        }
+
+        auth = firebase.auth();
+        db = firebase.firestore();
+        useFirestore = true;
         auth.onAuthStateChanged(u=>{
           if(u) onUserSignIn({uid:u.uid,name:u.displayName,email:u.email}); else onUserSignOut();
         });
-      }catch(e){console.warn('Firebase init failed',e);}    
+      }catch(e){
+        console.warn('Firebase init failed',e);
+      }
     }
 
-    function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+    function loadScript(src){
+      // if script tag already exists, don't insert another
+      if(document.querySelector(`script[src=\"${src}\"]`)) return Promise.resolve();
+      return new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src=src; s.async = true;
+        s.onload=res; s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+
 
     // Local persistence keys
     function storageKeyForUser(uid){return `hw:${uid||'local'}:${sessionDate}`}
