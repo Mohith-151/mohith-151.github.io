@@ -13,7 +13,14 @@
       --radius:14px; --maxw:980px;
     }
     *{box-sizing:border-box}
-    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;color:#e6eef8;background:radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,0.08), transparent), linear-gradient(180deg,#03040a 0%, #071428 70%);-webkit-font-smoothing:antialiased}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+      color:#e6eef8;
+      background:radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,0.08), transparent),
+                 linear-gradient(180deg,#03040a 0%, #071428 70%);
+      -webkit-font-smoothing:antialiased
+    }
     .wrap{max-width:var(--maxw);margin:28px auto;padding:20px}
     header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
     .brand{display:flex;align-items:center;gap:14px}
@@ -28,8 +35,15 @@
     .controls{display:flex;gap:10px;align-items:center}
 
     form.add{display:flex;gap:8px;flex-wrap:wrap}
-    input,select,button{padding:10px;border-radius:10px;border:0;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));color:inherit}
-    input[type='number']{width:110px}
+    input,select,button,textarea{
+      padding:10px;
+      border-radius:10px;
+      border:0;
+      background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));
+      color:inherit;
+      font-family:inherit;
+    }
+    input[type='number']{width:90px}
     input[type='date']{width:180px}
     .btn{cursor:pointer;font-weight:700}
     .btn-primary{background:linear-gradient(90deg,var(--accent2),var(--accent));color:#001}
@@ -44,7 +58,7 @@
     .rep input{width:18px;height:18px}
     .rep.done{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#001}
 
-    .ex-opts{display:flex;gap:8px;align-items:center}
+    .ex-opts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .small{font-size:0.9rem;color:var(--muted)}
 
     .progress{margin-top:10px}
@@ -59,24 +73,56 @@
 
     footer{margin-top:18px;color:var(--muted);font-size:0.9rem;text-align:center}
 
+    /* LIGHT THEME OVERRIDES */
+    body.light{
+      color:#020617;
+      background:radial-gradient(1200px 600px at 10% 10%, rgba(59,130,246,0.15), transparent),
+                 linear-gradient(180deg,#f9fafb 0%, #e5e7eb 70%);
+    }
+    body.light .muted{color:#6b7280}
+    body.light main{background:#ffffff;box-shadow:0 12px 45px rgba(15,23,42,0.08);}
+    body.light .session-card{background:#f9fafb;}
+    body.light .calendar{background:#f3f4f6;}
+    body.light .exercise{background:#e5e7eb;}
+    body.light .btn-primary{background:linear-gradient(90deg,#2563eb,#0ea5e9);color:#f9fafb;}
+    body.light .cal-day{background:#e5e7eb;}
+    body.light .cal-day.checked{background:linear-gradient(90deg,#4f46e5,#0ea5e9);color:#f9fafb;}
+    body.light .progress-bar{background:#e5e7eb;}
+
     /* Mobile: show calendar above the session card */
-@media (max-width:880px){
-  /* keep the vertical stack but ensure calendar comes first */
-  .top { flex-direction: column; }
-  .calendar {
-    order: -1;              /* move calendar to top of the column */
-    width: 100%;            /* full width on mobile */
-    margin-left: 0;         /* remove desktop left gap */
-    margin-bottom: 12px;    /* spacing below the calendar */
-  }
-  .session-card { order: 0; } /* explicit order for clarity */
+    @media (max-width:880px){
+      .top { flex-direction: column; }
+      .calendar {
+        order: -1;
+        width: 100%;
+        margin-left: 0;
+        margin-bottom: 12px;
+      }
+      .session-card { order: 0; }
 
-  /* keep header controls compact on phones */
-  header .controls { gap: 6px; }
+      header .controls { gap: 6px; }
 
-  /* shorten buttons spacing on very small screens */
-  .top .session-card, .top .calendar { padding: 12px; }
-}
+      .top .session-card, .top .calendar { padding: 12px; }
+    }
+
+    .completion{
+      font-size:1rem;
+      color:var(--muted);
+      display:flex;
+      align-items:baseline;
+      gap:6px;
+    }
+
+    .completion .label{
+      font-size:0.9rem;
+    }
+
+    .completion #percent{
+      font-size:1.6rem;
+      font-weight:800;
+      letter-spacing:0.03em;
+      color: rgb(126, 0, 222);
+    }
 
   </style>
 </head>
@@ -91,6 +137,7 @@
         </div>
       </div>
       <div class="controls">
+        <button id="themeToggle" type="button" class="btn btn-ghost" title="Toggle dark/light mode">☀</button>
         <div id="userInfo" class="muted">Not signed in</div>
         <button id="signBtn" type="button" class="btn btn-primary">Sign in with Google</button>
       </div>
@@ -102,20 +149,25 @@
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div>
               <div style="font-weight:800">Session</div>
-              <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+              <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
                 <div class="muted" id="sessionDate"></div>
                 <input id="sessionDateInput" type="date" title="Select session date (choose future dates to pre-plan)" />
                 <div class="muted small">(pick a date to plan or view)</div>
               </div>
             </div>
-            <div class="muted">Completion: <span id="percent">0%</span></div>
+            <div class="completion">
+            <span class="label">Completion:</span>
+            <span id="percent">0%</span>
+            </div>
           </div>
 
           <!-- novalidate prevents browser validation popups -->
           <form id="addForm" class="add" onsubmit="return false;" novalidate style="margin-top:12px">
             <input id="exName" placeholder="Exercise name" />
-            <input id="exReps" type="number" min="1" value="4" />
+            <input id="exReps" type="number" min="1" value="10" placeholder="Reps" title="Reps per set" />
+            <input id="exSets" type="number" min="1" value="4" placeholder="Sets" title="Number of sets (checkboxes)" />
             <button id="addBtn" type="button" class="btn btn-ghost">Add</button>
+            <button id="repeatYesterdayBtn" type="button" class="btn btn-ghost">Repeat yesterday</button>
             <button id="clearBtn" type="button" class="btn" style="background:transparent;color:var(--muted)">Clear</button>
           </form>
 
@@ -173,32 +225,79 @@
     // calendar view month/year (used for prev/next month buttons)
     let calView = { year: (new Date()).getFullYear(), month: (new Date()).getMonth() };
 
-    const state = { exercises: [] } // exercises: [{id,name,reps,doneCount, repsState: [bool...] }]
+    const state = { exercises: [] } // exercises: [{id,name,reps (sets),repsPerSet, repsState: [bool...] }]
 
     // DOM refs
     const el = id=>document.getElementById(id);
     const exList = el('exList'), percentEl = el('percent'), progressFill = el('progressFill'), sessionDateEl = el('sessionDate');
     const importFile = el('importFile'); const sessionDateInput = el('sessionDateInput');
 
+    // THEME
+    const THEME_KEY = 'hwTheme';
+
+    function applyTheme(theme){
+      if(theme === 'light'){
+        document.body.classList.add('light');
+      }else{
+        document.body.classList.remove('light');
+      }
+      const btn = el('themeToggle');
+      if(btn){
+        // Show the *target* of next click
+        const isLight = document.body.classList.contains('light');
+        btn.textContent = isLight ? '🌙' : '☀';
+      }
+    }
+
+    function initTheme(){
+      const saved = localStorage.getItem(THEME_KEY) || 'dark';
+      applyTheme(saved);
+      const btn = el('themeToggle');
+      if(btn){
+        btn.addEventListener('click', ()=>{
+          const isLight = document.body.classList.contains('light');
+          const next = isLight ? 'dark' : 'light';
+          localStorage.setItem(THEME_KEY, next);
+          applyTheme(next);
+        });
+      }
+    }
+
+    // date helpers
+    function strToDate(str){
+      const [y,m,d] = str.split('-').map(Number);
+      return new Date(y, m-1, d);
+    }
+    function dateToStr(d){
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    }
+    function offsetDateStr(str, deltaDays){
+      const d = strToDate(str);
+      d.setDate(d.getDate() + deltaDays);
+      return dateToStr(d);
+    }
+
     // setSessionDate now safely parses YYYY-MM-DD (no timezone shifts)
     function setSessionDate(d){
       sessionDate = d;
-      const [y,m,day] = d.split('-').map(Number);
-      const display = new Date(y, m-1, day);
+      const display = strToDate(d);
       sessionDateEl.textContent = display.toLocaleDateString();
       sessionDateInput.value = d; // reload state for that date
       loadState(); render(); updateCalendar();
     }
 
     // initialize display values
-    (function(){ const [y,m,day]=sessionDate.split('-').map(Number); sessionDateEl.textContent = new Date(y,m-1,day).toLocaleDateString(); sessionDateInput.value = sessionDate; })();
+    (function(){
+      const display = strToDate(sessionDate);
+      sessionDateEl.textContent = display.toLocaleDateString();
+      sessionDateInput.value = sessionDate;
+    })();
 
     // --- Persistence layer (Firestore if configured; otherwise localStorage) ---
     let useFirestore = false; let db=null; let auth=null;
     let _saveTimer = null;
 
     async function initFirebaseIfNeeded(){
-      // guard: initialize firebase only once — prevents duplicate auth listeners when user signs in/out repeatedly
       if(window.__firebaseInited) return; window.__firebaseInited = true;
       if(!FIREBASE_CONFIG) return;
       try{
@@ -207,7 +306,6 @@
         await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js');
         const app = firebase.initializeApp(FIREBASE_CONFIG);
         auth = firebase.auth(); db = firebase.firestore(); useFirestore = true;
-        // single auth state listener — pass the real firebase user object to handlers
         auth.onAuthStateChanged(u=>{
           if(u) onUserSignIn(u); else onUserSignOut();
         });
@@ -215,6 +313,30 @@
     }
 
     function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+
+    // normalization so old data still works
+    function normalizeExercises(list){
+      if(!Array.isArray(list)) return [];
+      return list.map(ex=>{
+        const reps = Number(ex.reps) || 0; // here reps = number of sets (checkboxes)
+        const srcState = Array.isArray(ex.repsState) ? ex.repsState : [];
+        const repsState = Array(reps).fill(false).map((_,i)=>!!srcState[i]);
+        let repsPerSet = ex.repsPerSet;
+        if(repsPerSet !== undefined && repsPerSet !== null && repsPerSet !== ''){
+          repsPerSet = Number(repsPerSet);
+          if(Number.isNaN(repsPerSet)) repsPerSet = undefined;
+        }else{
+          repsPerSet = undefined;
+        }
+        return {
+          id: ex.id || (Date.now().toString(36)+Math.random().toString(36).slice(2,7)),
+          name: ex.name || 'Exercise',
+          reps,              // number of sets
+          repsPerSet,        // reps per set (for label)
+          repsState
+        };
+      });
+    }
 
     // Local persistence keys
     function storageKeyForUser(uid, date){ return `hw:${uid||'local'}:${date}` }
@@ -228,12 +350,7 @@
           if(doc.exists){ 
             const data = doc.data(); 
             if(data && Array.isArray(data.exercises)){
-              // coerce/normalize saved exercises to expected shape to avoid stale types from remote
-              state.exercises = data.exercises.map(ex=>{
-                const reps = Number(ex.reps) || 0;
-                const repsState = Array.isArray(ex.repsState) ? ex.repsState.map(Boolean) : Array(reps).fill(false);
-                return { id: ex.id || (Date.now().toString(36)), name: ex.name || 'Exercise', reps, repsState };
-              });
+              state.exercises = normalizeExercises(data.exercises);
               render(); return; 
             }
           }
@@ -241,11 +358,12 @@
       }
       // fallback: localStorage
       const raw = localStorage.getItem(storageKeyForUser(currentUser?currentUser.uid:null, sessionDate));
-      if(raw){ try{ const parsed = JSON.parse(raw); if(parsed && parsed.exercises) state.exercises = parsed.exercises.map(ex=>{
-          const reps = Number(ex.reps) || 0;
-          const repsState = Array.isArray(ex.repsState) ? ex.repsState.map(Boolean) : Array(reps).fill(false);
-          return { id: ex.id || (Date.now().toString(36)), name: ex.name || 'Exercise', reps, repsState };
-        }); }catch(e){} }
+      if(raw){ 
+        try{ 
+          const parsed = JSON.parse(raw); 
+          if(parsed && Array.isArray(parsed.exercises)) state.exercises = normalizeExercises(parsed.exercises);
+        }catch(e){} 
+      }
       render();
     }
 
@@ -267,9 +385,10 @@
     // --- UI / behavior ---
     // Helper: update only progress UI (no full DOM rebuild)
     function updateProgressUI(){
+      // progress based on completed sets (checkboxes)
       let total = 0, done = 0;
       state.exercises.forEach(ex=>{
-        total += ex.reps || 0;
+        total += ex.reps || 0; // number of sets
         done += (ex.repsState || []).filter(Boolean).length;
       });
       const pct = total ? Math.round(done/total*100) : 0;
@@ -285,13 +404,26 @@
         const exId = ex.id;
         const wrap = document.createElement('div'); wrap.className = 'exercise';
         const left = document.createElement('div'); left.className = 'meta';
-        const title = document.createElement('div'); title.style.fontWeight='800'; title.textContent = ex.name;
-        const small = document.createElement('div'); small.className='muted'; small.textContent = `${ex.reps} reps`;
+
+        let titleText = ex.name;
+        let subText;
+        if(ex.repsPerSet){
+          titleText = `${ex.name} (${ex.repsPerSet} reps)`;
+          subText = `${ex.reps} sets`;
+        }else{
+          // old data fallback
+          titleText = ex.name;
+          subText = `${ex.reps} reps`;
+        }
+
+        const title = document.createElement('div'); title.style.fontWeight='800'; title.textContent = titleText;
+        const small = document.createElement('div'); small.className='muted'; small.textContent = subText;
         left.appendChild(title); left.appendChild(small);
 
         const right = document.createElement('div'); right.className='ex-opts';
         const repsWrap = document.createElement('div'); repsWrap.className='reps';
 
+        // ex.reps = number of sets (checkboxes)
         for(let i=0;i<ex.reps;i++){
           const repWrap = document.createElement('div'); repWrap.className='rep';
           repWrap.dataset.exId = exId;
@@ -300,26 +432,22 @@
           const checkbox = document.createElement('input');
           checkbox.type = 'checkbox';
           checkbox.checked = !!(ex.repsState && ex.repsState[i]);
-          checkbox.setAttribute('aria-label', `Rep ${i+1} for ${ex.name}`);
+          checkbox.setAttribute('aria-label', `Set ${i+1} for ${ex.name}`);
 
-          // Clicking the small 'rep' box toggles state. Use click on container to improve UX and remove flicker.
           repWrap.addEventListener('click', (ev)=>{
             ev.stopPropagation();
             toggleRepById(exId, i);
           });
 
-          // keep checkbox change handler but make it a no-op if it would produce the same state
           checkbox.addEventListener('change', (ev)=>{
             ev.stopPropagation();
-            // if ui already reflects desired state, just ensure model is synced
             const desired = !!checkbox.checked;
             const idx = state.exercises.findIndex(e => e.id === exId);
             if(idx===-1) return;
             const exm = state.exercises[idx];
             if(!Array.isArray(exm.repsState)) exm.repsState = Array(exm.reps).fill(false);
-            if(!!exm.repsState[i] === desired) return; // already in desired state
+            if(!!exm.repsState[i] === desired) return;
             exm.repsState[i] = desired;
-            // update visual class on the container
             if(desired) repWrap.classList.add('done'); else repWrap.classList.remove('done');
             updateProgressUI();
             saveState(false);
@@ -364,12 +492,29 @@
           const realIdx = state.exercises.findIndex(s=>s.id===id);
           if(realIdx===-1) return;
           const exObj = state.exercises[realIdx];
+
           const newName = prompt('Exercise name', exObj.name);
           if(newName === null) return;
-          const newReps = parseInt(prompt('Number of reps', exObj.reps));
-          if(isNaN(newReps) || newReps < 1) return alert('Invalid reps');
-          exObj.name = newName.trim() || exObj.name;
-          if(newReps !== exObj.reps){ exObj.reps = newReps; exObj.repsState = Array(newReps).fill(false);} 
+
+          const currentRepsPerSet = exObj.repsPerSet || 10;
+          const repsPerSetInput = prompt('Reps per set', currentRepsPerSet);
+          if(repsPerSetInput === null) return;
+          const newRepsPerSet = parseInt(repsPerSetInput);
+
+          const setsInput = prompt('Number of sets', exObj.reps || 4);
+          if(setsInput === null) return;
+          const newSets = parseInt(setsInput);
+
+          if(!newName.trim()) return alert('Invalid name');
+          if(isNaN(newRepsPerSet) || newRepsPerSet < 1) return alert('Invalid reps per set');
+          if(isNaN(newSets) || newSets < 1) return alert('Invalid number of sets');
+
+          exObj.name = newName.trim();
+          exObj.repsPerSet = newRepsPerSet;
+          if(newSets !== exObj.reps){
+            exObj.reps = newSets;
+            exObj.repsState = Array(newSets).fill(false);
+          }
           saveState(true);
           render();
         });
@@ -396,7 +541,6 @@
 
       ex.repsState[repIdx] = !ex.repsState[repIdx];
 
-      // reflect immediately in DOM (avoid full re-render to prevent flicker)
       const nodes = exList.children;
       for(let n=0;n<nodes.length;n++){
         const node = nodes[n];
@@ -421,23 +565,96 @@
 
     // add exercise
     el('addBtn').addEventListener('click', ()=>{
-      const name = el('exName').value.trim(); const reps = parseInt(el('exReps').value)||0;
-      if(!name || reps<=0){
+      const name = el('exName').value.trim();
+      const repsPerSet = parseInt(el('exReps').value) || 0;
+      const sets = parseInt(el('exSets').value) || 0;
+
+      if(!name || repsPerSet<=0 || sets<=0){
         if(!name) el('exName').classList.add('input-error'); else el('exName').classList.remove('input-error');
-        if(reps<=0) el('exReps').classList.add('input-error'); else el('exReps').classList.remove('input-error');
+        if(repsPerSet<=0) el('exReps').classList.add('input-error'); else el('exReps').classList.remove('input-error');
+        if(sets<=0) el('exSets').classList.add('input-error'); else el('exSets').classList.remove('input-error');
         return;
       }
-      const ex = { id:Date.now().toString(36), name, reps, repsState: Array(reps).fill(false) };
+
+      const ex = {
+        id: Date.now().toString(36),
+        name,
+        reps: sets,                    // reps = number of sets (checkboxes)
+        repsPerSet: repsPerSet,        // reps per set (label)
+        repsState: Array(sets).fill(false)
+      };
       state.exercises.push(ex);
-      el('exName').value=''; el('exReps').value=4;  el('exName').classList.remove('input-error'); el('exReps').classList.remove('input-error');
+
+      el('exName').value='';
+      el('exReps').value=10;
+      el('exSets').value=4;
+      el('exName').classList.remove('input-error');
+      el('exReps').classList.remove('input-error');
+      el('exSets').classList.remove('input-error');
+
       saveState(true);
       render();
     });
+
+    // Repeat yesterday feature
+    async function loadExercisesForDate(dateStr){
+      let exercises = [];
+      if(useFirestore && currentUser){
+        try{
+          const doc = await db.collection('sessions').doc(currentUser.uid).collection('days').doc(dateStr).get();
+          if(doc.exists){
+            const data = doc.data();
+            if(data && Array.isArray(data.exercises)){
+              exercises = normalizeExercises(data.exercises);
+            }
+          }
+        }catch(e){console.warn(e);}
+      }
+      if(!exercises.length){
+        const raw = localStorage.getItem(storageKeyForUser(currentUser?currentUser.uid:null, dateStr));
+        if(raw){
+          try{
+            const parsed = JSON.parse(raw);
+            if(parsed && Array.isArray(parsed.exercises)){
+              exercises = normalizeExercises(parsed.exercises);
+            }
+          }catch(e){}
+        }
+      }
+      return exercises;
+    }
+
+    el('repeatYesterdayBtn').addEventListener('click', async ()=>{
+    const yStr = offsetDateStr(sessionDate, -1);
+    let exercises = await loadExercisesForDate(yStr);
+    if(!exercises.length){
+      alert('No exercises found for yesterday.');
+      return;
+    }
+    const humanDate = strToDate(yStr).toLocaleDateString();
+    if(!confirm(`Replace current exercises with those from ${humanDate}?`)) return;
+
+    // Copy only structure; reset all progress
+    exercises = exercises.map(ex => ({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,7), // new ids
+      name: ex.name,
+      reps: ex.reps,                    // number of sets
+      repsPerSet: ex.repsPerSet,        // reps per set
+      repsState: Array(ex.reps).fill(false) // all checkboxes unchecked
+    }));
+
+    state.exercises = exercises;
+    saveState(true);
+    render();
+  }); 
+
+    
 
     el('clearBtn').addEventListener('click', ()=>{ if(confirm('Clear all exercises for this day?')){ state.exercises=[]; saveState(true); render(); } });
 
     el('exName').addEventListener('input', ()=>{ el('exName').classList.remove('input-error'); });
     el('exReps').addEventListener('input', ()=>{ el('exReps').classList.remove('input-error'); });
+    el('exSets').addEventListener('input', ()=>{ el('exSets').classList.remove('input-error'); });
 
     // calendar
     function updateCalendar(viewYear=calView.year, viewMonth=calView.month){
@@ -467,7 +684,13 @@
 
     function checkinExistsForDate(d){
       const key = storageKeyForUser(currentUser?currentUser.uid:null, d);
-      try{ const raw = localStorage.getItem(key); if(raw){ const s=JSON.parse(raw); return (s.exercises||[]).some(ex=> (ex.repsState||[]).some(Boolean)); } }catch(e){}
+      try{
+        const raw = localStorage.getItem(key);
+        if(raw){
+          const s=JSON.parse(raw);
+          return (s.exercises||[]).some(ex=> (ex.repsState||[]).some(Boolean));
+        }
+      }catch(e){}
       return false;
     }
 
@@ -493,7 +716,12 @@
         try{
           const parsed = JSON.parse(reader.result);
           if(parsed && Array.isArray(parsed.exercises)){
-            if(confirm('Replace current session with imported data?')){ state.exercises = parsed.exercises; if(parsed.date) setSessionDate(parsed.date); saveState(true); render(); }
+            if(confirm('Replace current session with imported data?')){
+              state.exercises = normalizeExercises(parsed.exercises);
+              if(parsed.date) setSessionDate(parsed.date); 
+              saveState(true); 
+              render(); 
+            }
           }else alert('Invalid file');
         }catch(e){alert('Invalid JSON');}
       };
@@ -511,22 +739,29 @@
     });
 
     function onUserSignIn(u){
-      // u is the firebase.User object
       currentUser = { uid: u.uid, name: u.displayName || u.email, email: u.email };
       el('userInfo').textContent = currentUser.name || currentUser.email;
       el('signBtn').textContent = 'Sign out';
       el('signBtn').removeAttribute('disabled');
       el('signBtn').onclick = ()=>auth.signOut();
-      // load and render session for the signed-in user
       loadState(); render(); updateCalendar();
     }
-    function onUserSignOut(){ currentUser = null; el('userInfo').textContent = 'Not signed in'; el('signBtn').textContent = 'Sign in with Google'; el('signBtn').onclick = null; initAfterAuth(); }
+    function onUserSignOut(){
+      currentUser = null;
+      el('userInfo').textContent = 'Not signed in';
+      el('signBtn').textContent = 'Sign in with Google';
+      el('signBtn').onclick = null;
+      initAfterAuth();
+    }
 
     async function initAfterAuth(){ await initFirebaseIfNeeded(); await loadState(); render(); }
 
     (async ()=>{
+      initTheme();
       await initFirebaseIfNeeded();
-      await loadState(); render(); updateCalendar();
+      await loadState(); 
+      render(); 
+      updateCalendar();
     })();
 
   </script>
